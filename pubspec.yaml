@@ -1,0 +1,15 @@
+name: symmetry_establishment
+description: Establishment / settings module
+publish_to: "none"
+version: 0.1.0
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  # Shared platform packages (wire once repos exist):
+  # symmetry_ui_kit:  { git: { url: https://github.com/SymmetryCare/symmetry-ui-kit.git } }
+  # symmetry_contracts: { git: { url: https://github.com/SymmetryCare/symmetry-contracts.git } }
+flutter:
+  uses-material-design: true
