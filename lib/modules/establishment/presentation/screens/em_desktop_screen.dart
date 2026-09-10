@@ -120,13 +120,24 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                     headingText: EmDashboardStringManager.em,
                     body: [
                       const SizedBox(width: 16),
-                      Expanded(
-                        flex: 1,
-                        child: Container(
-                          margin: EdgeInsets.symmetric(horizontal: AppPadding.p30),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
+                      // Sized by its children, never by a flex factor.
+                      // This list is handed to the app bar's nav slot, which
+                      // lays it out in a horizontally scrollable Row — the
+                      // incoming width is unbounded, so an Expanded here
+                      // throws "RenderFlex children have non-zero flex but
+                      // incoming width constraints are unbounded" and leaves
+                      // the bar and the whole screen under it unsized, which
+                      // paints as a blank page. See the contract note in
+                      // hh_emr_appbar.dart. Even spacing now comes from the
+                      // Row's own `spacing` rather than spaceBetween, which
+                      // needs a bounded width to divide up.
+                      Padding(
+                        padding:
+                            EdgeInsets.symmetric(horizontal: AppPadding.p30),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          spacing: AppPadding.p30,
+                          children: [
                               Obx(
                                     () => CustomTitleButton(
                                   height: AppSize.s30,
@@ -199,8 +210,7 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                                   },
                                 ),
                               ),
-                            ],
-                          ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 20),

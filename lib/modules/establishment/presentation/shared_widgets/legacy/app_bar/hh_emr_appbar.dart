@@ -466,6 +466,15 @@ class EmrAppBar extends StatelessWidget {
                       // than overflow; below
                       // [kAppBarNavCollapseBreakpoint] the caller sends a
                       // dropdown instead, so that growth shouldn't happen.
+                      //
+                      // NOTE the contract this implies: the incoming width
+                      // here is minWidth..Infinity, so every widget a caller
+                      // puts in `body` must size itself. A flex child
+                      // (Expanded/Flexible) is illegal and throws
+                      // "RenderFlex children have non-zero flex but incoming
+                      // width constraints are unbounded", which leaves the
+                      // whole bar and the screen under it unsized - a blank
+                      // page.
                       return SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: ConstrainedBox(

@@ -10,10 +10,10 @@ import 'package:symmetry_establishment/main.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/login_screen/widgets/login_flow_base_struct.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/screen_transition.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/hr_home_screen/hr_home_screen.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/services/notification_service.dart';
+import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 
 class LoginPasswordWeb extends StatefulWidget {
   static const String label = "/logInWithPassword";
@@ -63,7 +63,7 @@ class _LoginPasswordWebState extends State<LoginPasswordWeb> {
 
         Navigator.pushReplacementNamed(
           context,
-          HRHomeScreen.routeName,
+          RouteStrings.emDesktop,
         );
 
         print('Login completed successfully');

@@ -7,9 +7,9 @@ import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:symmetry_establishment/app/services/api/managers/auth/auth_manager.dart';
 import 'package:symmetry_establishment/data/api_data/api_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/tablet_constant/tab_const.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/hr_home_screen/hr_home_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login_password/login_password.dart';
+import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 
 class EmailVerifyTab extends StatefulWidget {
   final String email;
@@ -37,7 +37,7 @@ class _EmailVerifyTabState extends State<EmailVerifyTab> {
     if (result.success) {
       Navigator.pushNamedAndRemoveUntil(
         context,
-        HRHomeScreen.routeName,
+        RouteStrings.emDesktop,
         (route) => false,
       );
     } else {

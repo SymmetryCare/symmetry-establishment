@@ -7,9 +7,9 @@ import 'package:symmetry_establishment/app/services/api/managers/auth/auth_manag
 import 'package:symmetry_establishment/data/api_data/api_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/screen_transition.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/hr_home_screen/hr_home_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/tablet_constant/tab_const.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
+import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 
 class LoginPassswordTab extends StatefulWidget {
   static const String label = "/logInWithPassword";
@@ -41,7 +41,7 @@ class _LoginPassswordTabState extends State<LoginPassswordTab> {
       if (apiData.success) {
         Navigator.pushNamedAndRemoveUntil(
           context,
-          HRHomeScreen.routeName,
+          RouteStrings.emDesktop,
           (route) => false,
         );
       } else {

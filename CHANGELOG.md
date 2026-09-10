@@ -2,6 +2,140 @@
 
 All notable changes to this repo. Newest first.
 
+## 2026-09-10 - white screen: diagnosis aids, and one confirmed cause ruled in
+
+Chasing a reported blank screen after login. Both login paths were driven
+end-to-end through the UI against a stub backend - email -> OTP, and
+email -> "Don't have authentication application with me?" -> password - and
+both reach the Establishment dashboard. The reported failure was **not
+reproduced**, so what follows is what was ruled in and out, not a confirmed
+fix for it.
+
+### Ruled out as the cause
+
+- The post-login route (fixed earlier today; verified reaching the module).
+- `FrontendConfigStore` being null. Tested directly by disabling the loader
+  added earlier and re-running the password login: it still reached the
+  dashboard. That fix stands - 343 null-assertions with no loader is a real
+  latent crash - but it is not this bug.
+- `--base-href` / serving under a subpath, and service workers, in a local
+  reproduction of the `/establishment/` layout.
+
+### Confirmed cause of *a* blank screen
+
+Building without `--base-href=/establishment/` and serving at
+`/establishment/` produces exactly this symptom. `index.html` gets
+`<base href="/">`, so the bundle is requested from the origin root:
+
+```
+GET /establishment/       -> 200
+GET /flutter_bootstrap.js -> 404   <- nothing renders, blank page
+```
+
+Hit accidentally while testing, and worth checking first in any deployment:
+the Network tab shows a lone 404 for `flutter_bootstrap.js` or `main.dart.js`.
+
+### New: an opt-in error surface
+
+`app/services/config/error_surface.dart`, installed at the top of `main()` and
+**off by default**, so production behaviour is unchanged. Built with
+
+```
+flutter build web --dart-define=DEBUG_ERRORS=true
+```
+
+a build-time exception renders the message, the widget being built and the top
+of the stack instead of a blank page, and every framework error is printed to
+the console. Verified by injecting a deliberate null-assert into
+`ResponsiveScreenEM.build`: the page showed "This screen failed to build -
+Null check operator used on a null value" with the stack. The injected fault
+was removed afterwards; `grep FORCE_CRASH lib` is clean.
+
+### Verified
+
+- `flutter analyze` - 0 errors.
+- Shell-hosted build serves and boots correctly at `/establishment/`.
+
+## 2026-09-10 - frontend config was never loaded (white screen after login)
+
+The Establishment screens read `FrontendConfigStore.data!` - a hard null
+assertion - in **343 places**: document type ids, department ids, expiry-type
+labels. Nothing in this repo ever populated that store. symmetry-shell loads it
+from the API and caches it; symmetry-hr gets away without a loader only because
+its demo shim (`demo_employee.dart`, which this repo does not have) seeds it.
+Establishment had neither, so every one of those 343 sites was a guaranteed
+throw - and a thrown exception during build is a white screen.
+
+- Ported `appconfige_manager.dart` from symmetry-shell - the real loader, which
+  also caches the raw response under `frontend_config_data`.
+- Added `app/services/config/frontend_config_boot.dart` and awaited it in
+  `main()` **before `runApp`**, so the store is non-null before the first
+  screen builds. Three sources, in order:
+  1. the `SharedPreferences` cache - which on web is origin-scoped
+     `localStorage`, so a shell-hosted build at `/establishment/` inherits the
+     config the shell already fetched, exactly like the session token;
+  2. compiled-in defaults if there is no cache, because a standalone first run
+     has nobody to inherit from and a wrong-but-present id renders a working
+     screen where a null one renders nothing;
+  3. the live API, refreshed after the first frame and written back to the
+     cache.
+- `main.dart` now owns a `navigatorKey` (the refresh needs a context that
+  outlives any one screen; the app bar already imported `main.dart` expecting
+  one).
+
+Note the config endpoint is an absolute URL on `auth.symmetry.care`, not
+`API_ENDPOINT`, so it resolves the same in every deployment shape.
+
+### Verified
+
+- Full login driven through the UI against a stub backend: email -> OTP ->
+  Establishment dashboard, with the user in the app bar; Company Identity opens
+  too. No exceptions in the browser console.
+- Console confirms the sequence: defaults seeded, then
+  `Frontend config loaded from API. salesId: 2`, then cached.
+- `flutter analyze` - 0 errors. Both build shapes still build with the right
+  `<base href>`.
+- **Not reproduced:** the reported white screen itself. Against a stub the
+  establishment endpoints return empty collections, so the `data!` paths never
+  execute and the screen rendered even before this fix. This addresses the one
+  mechanism that certainly produces a white screen on those paths, but it is
+  not confirmed to be the same one. If it recurs, the browser console's first
+  exception will name the file and line.
+
+## 2026-09-10 - fix: login succeeded but the login screen stayed up
+
+The login flow came over from symmetry-hr with HR's destination still in it.
+On success it called `Navigator.pushReplacementNamed(context,
+HRHomeScreen.routeName)` - `/hrDesktop`, a route this app's `_generateRoute`
+does not name - so it fell through to `default:`, which tested `isSignedIn`.
+That field is a snapshot taken in `main()` before the first frame, so it was
+still `false`, and the fallback rebuilt `LoginScreen`. The login had actually
+worked and the token was written; only the navigation was wrong.
+
+- Six login screens (`login_password_*`, `email_verification_*`) now navigate
+  to `RouteStrings.emDesktop`. The unused `HRHomeScreen` imports went with it.
+- `email_verification_web` also called `setRoute(RouteStrings.hrDesktop)` on
+  one branch. Both branches of that department check already went to the same
+  place - this app serves one module - so the branch is collapsed and the
+  recorded route is `emDesktop`.
+- Hardened the fallback so this cannot silently recur: `_generateRoute` now
+  tests a live `_hasSession` flag instead of the boot snapshot. `main()` seeds
+  it, routing to the module sets it, and routing to the login screen (logout,
+  session expiry) clears it. `isSignedIn` still decides `initialRoute`, which
+  is the one place a boot snapshot is correct.
+- `RouteStrings.home` is handled as an alias for the module home.
+
+### Verified
+
+- Every named-route push in the app cross-checked against the router: no
+  unhandled targets remain.
+- Ran the built app against a static server in a browser: signed out it shows
+  the login screen; with a session in `localStorage` it boots straight to the
+  Establishment dashboard.
+- `flutter analyze` - 0 errors.
+- Not verified: a real login against a live backend, which needs credentials
+  and a reachable API.
+
 ## 2026-09-10 - runnable standalone app, and hostable behind symmetry-shell
 
 The repo was a bare copy-out of the monolith's `lib/presentation/screens/em_module`:

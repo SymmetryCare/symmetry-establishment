@@ -14,7 +14,6 @@ import 'package:symmetry_establishment/data/api_data/api_data.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 import 'package:symmetry_establishment/main.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/login_screen/widgets/login_flow_base_struct.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/hr_home_screen/hr_home_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login_password/login_password.dart';
@@ -61,23 +60,17 @@ class _EmailVerifyWebState extends State<EmailVerifyWeb> {
 
         if (!mounted) return; // ✅ another await happened above — check again
 
-        final frontendConfig = FrontendConfigStore.data?.config;
-        if (frontendConfig != null &&
-            (dept == frontendConfig.salesId ||
-                dept == frontendConfig.clinicalId)) {
-          Provider.of<RouteProvider>(context, listen: false)
-              .setRoute(RouteStrings.hrDesktop);
+        // Both branches land on the Establishment module — this app serves
+        // one module, so there is nowhere else for a verified user to go. The
+        // department split upstream chose between HR and Establishment; here
+        // it only decided which route to record, so it is gone.
+        Provider.of<RouteProvider>(context, listen: false)
+            .setRoute(RouteStrings.emDesktop);
 
-          await Navigator.pushReplacementNamed(
-            context,
-            HRHomeScreen.routeName,
-          );
-        } else {
-          await Navigator.pushReplacementNamed(
-            context,
-            HRHomeScreen.routeName,
-          );
-        }
+        await Navigator.pushReplacementNamed(
+          context,
+          RouteStrings.emDesktop,
+        );
       } else {
         if (mounted) {
           setState(() {

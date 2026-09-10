@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import 'package:symmetry_establishment/app/resources/provider/version_provider.dart';
+import 'package:symmetry_establishment/app/services/config/error_surface.dart';
+import 'package:symmetry_establishment/app/services/config/frontend_config_boot.dart';
 import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/data/navigator_arguments/screen_arguments.dart';
@@ -21,13 +23,26 @@ import 'package:symmetry_establishment/presentation/screens/login_module/forget_
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 
+/// Global navigator key. The app bar reaches for it, and the post-first-frame
+/// frontend-config refresh needs a `BuildContext` that outlives any one screen.
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // No-op unless built with --dart-define=DEBUG_ERRORS=true.
+  ErrorSurface.install();
   await dotenv.load(fileName: 'config/establishment.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
+  // Must complete before the first frame: the Establishment screens read
+  // `FrontendConfigStore.data!` in ~340 places, so a null store is a white
+  // screen rather than a degraded one. See FrontendConfigBoot.
+  await FrontendConfigBoot.ensureLoaded();
+
   final accessToken = await TokenManager.getAccessToken();
-  runApp(EstablishmentApplication(isSignedIn: accessToken.isNotEmpty));
+  final bool signedIn = accessToken.isNotEmpty;
+  EstablishmentApplication.markSession(signedIn);
+  runApp(EstablishmentApplication(isSignedIn: signedIn));
 }
 
 /// Establishment runs in the same two shapes HR does — standalone at the site
@@ -40,6 +55,16 @@ class EstablishmentApplication extends StatelessWidget {
   const EstablishmentApplication({super.key, required this.isSignedIn});
 
   final bool isSignedIn;
+
+  /// Whether a session exists *now*, as opposed to at boot.
+  ///
+  /// [isSignedIn] is a snapshot taken in `main()`, before the first frame. It
+  /// is the right thing for `initialRoute`, but it is wrong for the fallback
+  /// in [_generateRoute]: after a successful login it still says `false`, so
+  /// any route this table does not name would send a signed-in user back to
+  /// the login screen. `onGenerateRoute` is synchronous and cannot re-read the
+  /// async token store, so the login hand-off flips this instead.
+  static bool _hasSession = false;
 
   @override
   Widget build(BuildContext context) {
@@ -55,6 +80,7 @@ class EstablishmentApplication extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AddHolidayProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         title: 'Symmetry Establishment',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
@@ -68,18 +94,34 @@ class EstablishmentApplication extends StatelessWidget {
         initialRoute:
             isSignedIn ? RouteStrings.emDesktop : LoginScreen.routeName,
         onGenerateRoute: _generateRoute,
+        builder: (BuildContext context, Widget? child) {
+          // Replace the cached/default config with the live one once there is
+          // a context to make the call with.
+          FrontendConfigBoot.refreshInBackground(navigatorKey);
+          return child ?? const SizedBox.shrink();
+        },
       ),
     );
   }
+
+  /// Record whether a session exists. Called from `main()` with the boot
+  /// snapshot, and again when the login flow hands off to the module.
+  static void markSession(bool value) => _hasSession = value;
 
   Route<dynamic> _generateRoute(RouteSettings settings) {
     final Widget page;
 
     switch (settings.name) {
+      // Reaching the module means the login flow completed (or the app booted
+      // with a session), so the token is written by now.
       case RouteStrings.emDesktop:
+      case RouteStrings.home:
+        _hasSession = true;
         page = ResponsiveScreenEM();
         break;
       case LoginScreen.routeName:
+        // Logout and session-expiry both land here; the session is gone.
+        _hasSession = false;
         page = const LoginScreen();
         break;
       case EmailVerification.routeName:
@@ -97,7 +139,7 @@ class EstablishmentApplication extends StatelessWidget {
             email == null ? const LoginScreen() : VerifyPassword(email: email);
         break;
       default:
-        page = isSignedIn ? ResponsiveScreenEM() : const LoginScreen();
+        page = _hasSession ? ResponsiveScreenEM() : const LoginScreen();
         break;
     }
 
