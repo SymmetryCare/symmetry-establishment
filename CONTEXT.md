@@ -93,8 +93,11 @@ and should be checked against the live API:
 - `resources/`: `em_dashboard_string_manager.dart`, `em_dashboard_theme.dart`
 - `providers/`: `em_main_provider.dart`, `delete_popup_provider.dart`
 
-30 dashboard images were not in any repo here either; they are **placeholder
-tiles** (see CHANGELOG) and need the real artwork.
+All referenced artwork is real: the 30 dashboard images that were briefly
+placeholder tiles were imported from the `Symmetry-Application-FE` monolith,
+along with one zero-byte file (`assets/png/action_needed.png`). Every asset the
+module references (74 files) is present, non-empty and declared in
+`pubspec.yaml`.
 
 ---
 _This CONTEXT.md is the machine- and human-readable brief for the repo. Keep it current; log every change in CHANGELOG.md._

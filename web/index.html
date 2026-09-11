@@ -31,8 +31,40 @@
 
   <title>Symmetry Establishment</title>
   <link rel="manifest" href="manifest.json">
+
+  <!--
+    Google Maps JavaScript API.
+
+    google_maps_flutter_web is a thin wrapper over this script: it reads
+    `window.google.maps` while building the GoogleMap widget and throws
+    "Cannot read properties of undefined (reading 'maps')" if the script has
+    not run yet. So it is loaded synchronously here, *before*
+    flutter_bootstrap.js, rather than with async/defer — deferring it turns the
+    dependency into a race that only fails on slower connections.
+
+    symmetry-hr has no map screens, which is why its index.html omits this.
+    Establishment renders maps in Company Identity (office locations, zones),
+    so it needs the loader.
+
+    The key is the same public browser key the deployed app already uses; a
+    Maps browser key is necessarily visible to the client and is restricted by
+    HTTP referrer on the Google Cloud side, not by secrecy.
+  -->
+  <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCw6mXOPCtbKn5i0bWcAcnfXCkb0y5G7Lg"></script>
 </head>
 <body>
+  <!--
+    PDF.js, for the same reason: pdfx's web implementation calls into
+    `globalThis.pdfjsLib` (Onboarding renders acknowledgement and health-record
+    PDFs via PdfDocument.openData), and without this it fails at open time.
+  -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs" type="module"></script>
+  <script type="module">
+    var { pdfjsLib } = globalThis;
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
+  </script>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

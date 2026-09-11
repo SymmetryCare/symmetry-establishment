@@ -2,6 +2,164 @@
 
 All notable changes to this repo. Newest first.
 
+## 2026-09-11 - register the twelve missing app-wide providers
+
+Opening Manage HR > Work Schedule > Define Holidays threw
+`ProviderNotFoundException` for `DefineHolidaysProvider`: the screen has a
+`Consumer<T>` but no provider of `T` anywhere above it, so the screen went
+down as soon as it was built.
+
+An audit of the whole module - every `Consumer`/`Consumer2`/`Selector`,
+`context.watch/read/select`, and `Provider.of` against every place a provider
+is created - turned up **twelve** types consumed with no provider above them,
+each one a screen that would crash the first time it was opened:
+
+Ten of them are in symmetry-hr's own `main.dart` and were simply not carried
+over when this entrypoint was written: `HrManageProvider` (19 call sites),
+`HrOnboardingProvider` (14), `HrProgressMultiStape` (9),
+`HrEnrollEmployeeProvider` (5), `HrEnrollOfferLatterProvider` (5),
+`HrRegisterProvider` (3), `HRLicenseProvider` (2), `HRBankingProvider`,
+`HrSearchProviderManager`, `PageIndexProvider`.
+
+Two belong to Establishment-only screens and have no HR counterpart:
+`DefineHolidaysProvider` and `DeleteUserProvider` (the See All user table's
+delete action).
+
+Three further names the scan flagged - `AuthProvider`, `ButtonProvider`,
+`AddNewOrgDocButtonProviider` (note the typo) - appear only inside
+commented-out code, so nothing was added for them.
+
+### Verified
+
+`flutter analyze`: 0 errors. Drove a debug build through every entry in the
+module menu - Users, Visits, Designation Settings, Work Schedule (both
+Shifts & Batches and Define Holidays), Employee Documents, Pay Rate, Document
+Definition - and each screen renders with no `ProviderNotFoundException` and
+no error widget. Both release artifacts rebuilt.
+
+### Not ours
+
+`workWeekShiftScheduleGet` returns **404**. Its path
+(`/workWeekShiftSchedule/findByWeekDay/{weekDay}/{companyId}`) is byte-identical
+to symmetry-hr's, so it is not one of this repo's reconstructed endpoints - the
+route is missing on the API being pointed at.
+
+## 2026-09-11 - web/index.html loads the JS libraries the plugins need
+
+`GoogleMap` threw `TypeError: Cannot read properties of undefined (reading
+'maps')` the moment Company Identity tried to build a map. `google_maps_flutter_web`
+is a wrapper over the Google Maps JavaScript API: it reads `window.google.maps`
+during build, and nothing was loading that script.
+
+symmetry-hr's `index.html`, which this repo's was copied from, has no such tag
+because HR has no map screens - it only carries the two map *providers*.
+Establishment renders real maps (office locations, zones, the location picker),
+so it needs the loader.
+
+Added to `web/index.html`, both **synchronous and ahead of**
+`flutter_bootstrap.js` - deferring either one turns the dependency into a race
+that only loses on slow connections:
+
+- **Google Maps JS API** - same public browser key the deployed app uses. A
+  Maps browser key is necessarily visible to the client; it is protected by an
+  HTTP-referrer restriction on the Google Cloud side, not by secrecy.
+- **PDF.js** (+ worker) - same class of bug, not yet hit: `pdfx` calls
+  `globalThis.pdfjsLib`, and Onboarding opens acknowledgement and health-record
+  PDFs through `PdfDocument.openData`. It would have failed at open time.
+
+### Verified
+
+Ran the release build and drove it: `window.google.maps.Map` and
+`globalThis.pdfjsLib` both defined, and Company Identity -> Add New Office ->
+Pick Location renders a live, fully tiled Google map with a draggable marker -
+no exception. Both artifacts rebuilt (`web-standalone`, `web-shell`).
+
+## 2026-09-10 - real assets imported from Symmetry-Application-FE
+
+The 30 dashboard images that shipped as generated placeholder tiles are now the
+real artwork, copied from the `Symmetry-Application-FE` monolith at the same
+paths. Also fixed `assets/png/action_needed.png`, which had come across from
+symmetry-hr as a **zero-byte** file; the monolith's copy is 1221 bytes.
+
+Only asset files were taken from the monolith - no code.
+
+### Verified
+
+- Placeholders identified by content hash (all 30 were byte-identical), so the
+  replacement is exhaustive rather than by memory of which ones were stubbed.
+- Full re-sweep of the module for asset references, including interpolated
+  paths: **74 distinct assets**, all present on disk, none zero-byte, all
+  covered by a `pubspec.yaml` declaration.
+- Served the release build and fetched all 74 through the running app:
+  **74/74 HTTP 200, no empty responses**, 2.5 MB total.
+- Dashboard rendered at 1600x900: hero illustration, the key in the Encryption
+  Key donut and every metric-card icon now show real art instead of grey tiles.
+- 19 of the 74 are HR-era icons that postdate the monolith fork and exist only
+  in symmetry-hr; they were already correct and were left alone.
+- `flutter analyze` - 0 errors. Both release artifacts rebuilt
+  (`build/web-standalone`, `build/web-shell`).
+
+## 2026-09-10 - fix: blank screen after login was an unbounded-flex layout crash
+
+Root cause, from the debug-build stack trace: **"RenderFlex children have
+non-zero flex but incoming width constraints are unbounded"**, thrown by the
+`Row` that lays out the app bar's nav slot.
+
+`hh_emr_appbar` puts the caller's `body` widgets into a Row inside a horizontal
+`SingleChildScrollView` under `ConstrainedBox(minWidth: slot.maxWidth)` - so the
+incoming width is `minWidth..Infinity`. That is fine for HR, whose nav items
+size themselves, but `em_desktop_screen` passed an `Expanded(flex: 1, ...)`
+into it. A flex child cannot resolve against an unbounded width, so layout
+threw; every box under the failure then reported `RenderBox was not laid out`,
+and a render tree with no sizes paints as a blank page.
+
+- **`em_desktop_screen`**: the nav is now `Padding > Row(mainAxisSize.min,
+  spacing: AppPadding.p30)` instead of `Expanded > Container > Row(spaceBetween)`.
+  `spaceBetween` also needs a bounded width to divide up, so the even spacing
+  comes from the Row's own `spacing`.
+- **`hh_emr_appbar`**: unchanged behaviour - it is HR's shared widget and its
+  scrolling is what keeps a too-wide nav usable. The constraint it imposes on
+  callers ("every widget in `body` must size itself") is now written down at
+  the slot, since nothing said so and violating it costs a blank screen.
+- **`responsive_app_bar` / `responsive_screen`**: both pushed the measured
+  width into a GetX `ScreenSizeController` from inside their `LayoutBuilder`
+  callbacks and read the `RxBool`s straight back. Assigning an `Rx` notifies
+  listeners, and the callback runs during layout, so that mutated observable
+  state mid-layout. Nothing outside those two builders ever read the flags, so
+  the branch is computed from `constraints` directly now, with no side effect.
+  Their old `else` branch also returned an empty `Scaffold` for a width of
+  exactly 800 - a second, narrower blank screen - which is gone with it.
+
+### Why this was not caught earlier
+
+The failing assertions are `assert`s: they fire in debug and are compiled out
+of release. Earlier verification here used `flutter build web` (release), where
+the same broken layout silently produces an unsized tree - a blank page with no
+console error - which is exactly the symptom reported. Reproduction needed
+`flutter run` (debug), matching how it was hit.
+
+### Verified
+
+Driven in a debug build (assertions on) against a stub backend, signed in, at
+several viewport widths:
+
+- **1920x900** (the width in the reported trace): dashboard renders, **0 layout
+  errors**. Company Identity opens clean too.
+- 1440x900: renders, 0 layout errors.
+- 1280x850: renders; one remaining `RenderFlex overflowed` warning from a
+  dashboard card (`dashboard/widgets/screens/widgets/general_setting_const.dart:127`).
+- 1100x800: renders; the same card overflows by 64px.
+
+Those remaining warnings are cosmetic (yellow stripe, no crash), come from the
+extracted dashboard card rather than the app bar, and do not occur at 1920.
+They are **not fixed here** - narrowing that card is a separate change and the
+design intent for it is not documented.
+
+- `flutter analyze` - 0 errors in symmetry-establishment, symmetry-hr and
+  symmetry-shell.
+- Release artifacts rebuilt: `build/web-standalone` (`<base href="/">`) and
+  `build/web-shell` (`<base href="/establishment/">`).
+
 ## 2026-09-10 - white screen: diagnosis aids, and one confirmed cause ruled in
 
 Chasing a reported blank screen after login. Both login paths were driven

@@ -18,6 +18,13 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/providers/em_main_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/navigation_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/office_location.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/hr_home_screen/referesh_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/define_holidays.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/offer_letter_screen.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/see_all_screen/widgets/user_delete_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/providers/hr_onboarding_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/providers/hr_register_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/providers/hr_search_provider.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/email_verification/email_verification.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_pass_verification/forget_pass_verification.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
@@ -78,6 +85,30 @@ class EstablishmentApplication extends StatelessWidget {
             create: (_) => SeeAllPaginationProvider(itemsPerPage: 10)),
         ChangeNotifierProvider(create: (_) => EditUserProvider()),
         ChangeNotifierProvider(create: (_) => AddHolidayProvider()),
+
+        // Consumed by screens the module reaches from the dashboard, and
+        // provided nowhere below them - a `Consumer<T>` with no matching
+        // provider above it throws ProviderNotFoundException and takes the
+        // whole screen down. symmetry-hr registers the same set app-wide in
+        // its own main.dart; these were simply not carried over when this
+        // entrypoint was written, so each screen crashed the first time it
+        // was opened.
+        ChangeNotifierProvider(create: (_) => HrManageProvider()),
+        ChangeNotifierProvider(create: (_) => HrSearchProviderManager()),
+        ChangeNotifierProvider(create: (_) => HrRegisterProvider()),
+        ChangeNotifierProvider(create: (_) => HrEnrollEmployeeProvider()),
+        ChangeNotifierProvider(create: (_) => HrEnrollOfferLatterProvider()),
+        ChangeNotifierProvider(create: (_) => HrOnboardingProvider()),
+        ChangeNotifierProvider(create: (_) => HrProgressMultiStape()),
+        ChangeNotifierProvider(create: (_) => HRLicenseProvider()),
+        ChangeNotifierProvider(create: (_) => HRBankingProvider()),
+        ChangeNotifierProvider(create: (_) => PageIndexProvider()),
+
+        // Not in HR's list - these belong to Establishment-only screens
+        // (Manage HR > Work Schedule > Define Holidays, and the See All user
+        // table's delete action), which likewise provide them nowhere.
+        ChangeNotifierProvider(create: (_) => DefineHolidaysProvider()),
+        ChangeNotifierProvider(create: (_) => DeleteUserProvider()),
       ],
       child: MaterialApp(
         navigatorKey: navigatorKey,
