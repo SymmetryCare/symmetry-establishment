@@ -21,11 +21,11 @@ import 'package:symmetry_establishment/main.dart'; // ✅ gives access to global
 
 /// Where to send the user once the session has been cleared.
 ///
-/// Standalone, that is HR's own login screen — unchanged. Shell-hosted, the
-/// login screen belongs to the shell, and pushing HR's copy would strand the
-/// user on a second login form at `/hr/` that the module picker is never
-/// reached from. The four logout branches below all end here so the two shapes
-/// cannot drift apart.
+/// Standalone, that is Establishment's own login screen — unchanged.
+/// Shell-hosted, the login screen belongs to the shell, and pushing
+/// Establishment's copy would strand the user on a second login form at
+/// `/establishment/` that the module picker is never reached from. The four
+/// logout branches below all end here so the two shapes cannot drift apart.
 void _afterSignOut(BuildContext context) {
   if (ShellLink.isHosted) {
     ShellLink.signOutRedirect();
@@ -72,7 +72,10 @@ const double _kLogoToDividerGap = 11;
 const double _kLeftDividerHeight = 23;
 const double _kDividerToModuleGap = 5;
 
-const double _kModuleBoxWidth = 118;
+// 118 in symmetry-hr, where the label is the 9-character "HR Module".
+// "Establishment" is 13 and ellipsised to "Establish..." at that width,
+// so the box is widened here rather than the module abbreviated.
+const double _kModuleBoxWidth = 146;
 const double _kModuleBoxHeight = 30;
 const double _kModuleIconInset = 9;
 const double _kModuleIconSize = 16;
@@ -383,7 +386,7 @@ class EmrAppBar extends StatelessWidget {
     this.isEmrClinicianModule = false,
     this.hideNameOnSmallScreen = false,
     this.shortHeadingText,
-    this.moduleLabel = 'HR Module',
+    this.moduleLabel = 'Establishment',
     this.onModuleTap,
     this.onNotificationTap,
     this.searchField,

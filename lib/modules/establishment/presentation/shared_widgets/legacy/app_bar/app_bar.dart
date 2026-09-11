@@ -15,7 +15,7 @@ class ApplicationEmrAppBar extends StatelessWidget {
     this.isEmrClinicianModule = false,
     this.hideNameOnSmallScreen = false,
     this.shortHeadingText,
-    this.moduleLabel = 'HR Module',
+    this.moduleLabel = 'Establishment',
     this.onModuleTap,
     this.onNotificationTap,
     this.searchField,

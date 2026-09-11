@@ -2,6 +2,28 @@
 
 All notable changes to this repo. Newest first.
 
+## 2026-09-11 - app bar said "HR Module"
+
+The shared layer in this repo is a copy of symmetry-hr's, and the app bar's
+module chip kept HR's default label. Shell-hosted, that put "HR Module" at the
+top left of every Establishment screen, next to a chip that returns to the
+module picker - so the one control that tells you which module you are in
+named the wrong one.
+
+- `moduleLabel` now defaults to `'Establishment'` in both `hh_emr_appbar.dart`
+  and the `app_bar.dart` wrapper.
+- `_kModuleBoxWidth` 118 -> 146. The chip is a fixed-width box sized for the
+  9-character "HR Module"; "Establishment" ellipsised to "Establish..." at 118.
+- `_afterSignOut`'s doc comment still described HR and `/hr/`. Wording only.
+
+### Verified
+
+Composed both release builds on one origin (shell at `/`, this app at
+`/establishment/` with `SHELL_PATH=/`) and drove the round trip in a browser:
+a session in `localStorage` boots straight to the EM dashboard, the chip reads
+"Establishment" and returns to the shell's picker, and the shell's header
+settings icon comes back here already signed in. Nav row unclipped at 1440px.
+
 ## 2026-09-11 - register the twelve missing app-wide providers
 
 Opening Manage HR > Work Schedule > Define Holidays threw
