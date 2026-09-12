@@ -834,6 +834,37 @@ Future<ApiData> deleteUserApi(
   }
 }
 
+/// Speciality post
+Future<ApiData> addEmployeeSpeciality({
+  required BuildContext context,
+  required String speciality,
+}) async {
+  try {
+    var response = await Api(context).post(
+        path: ProfileRepository.addEmployeeSpeciality(),
+        data: {
+          "speciality": speciality,
+        });
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print("Speciality added");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: true,
+          message: response.statusMessage!);
+    } else {
+      print("Speciality Error 1");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: false,
+          message: response.data['message']);
+    }
+  } catch (e) {
+    print("Error $e");
+    return ApiData(
+        statusCode: 404, success: false, message: AppString.somethingWentWrong);
+  }
+}
+
 /// Speciality get by department
 Future<List<SpecialityModeldata>> getSpecialityListByDeptId({
   required BuildContext context,

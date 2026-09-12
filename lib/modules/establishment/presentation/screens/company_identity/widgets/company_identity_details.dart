@@ -17,6 +17,8 @@ import 'package:symmetry_establishment/modules/establishment/resources/establish
 import 'package:symmetry_establishment/modules/establishment/resources/hr_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/delete_success_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/widgets/button_constant.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/add_office_service_popup.dart';
 
 class CIDetailsScreen extends StatefulWidget {
   CIDetailsScreen({
@@ -120,14 +122,16 @@ class _CIDetailsScreenState extends State<CIDetailsScreen> {
             longitude = snapshot.data!.long;
 
             List<Widget> serviceRows = [];
+            final List<DetailsServiceData> serviceDetailsList =
+                snapshot.data!.serviceDetails ?? [];
             print('Fetched lat lng ${latitude} + ${longitude}');
 
-            for (int i = 0; i < snapshot.data!.serviceDetails!.length; i += 2) {
+            for (int i = 0; i < serviceDetailsList.length; i += 2) {
               List<Widget> rowChildren = [];
 
               for (int j = 0; j < 2; j++) {
-                if (i + j < snapshot.data!.serviceDetails!.length) {
-                  var serviceDetail = snapshot.data!.serviceDetails![i + j];
+                if (i + j < serviceDetailsList.length) {
+                  var serviceDetail = serviceDetailsList[i + j];
                   npiNumController.text = serviceDetail.npiNum;
                   hcoNumController.text = serviceDetail.hcoNum;
                   medicareController.text = serviceDetail.medicareNum;
@@ -544,27 +548,61 @@ class _CIDetailsScreenState extends State<CIDetailsScreen> {
                     ),
                   ),
                   /// Service List
-                  if (snapshot.data!.serviceDetails != null && snapshot.data!.serviceDetails!.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Services',
-                            style: HeadingFormStyle.customTextStyle(context),
-                          ),
-                          const SizedBox(height: AppSize.s25),
-                          Container(
-                            //color: Colors.purple,
-                            child: Column(
-                              children: serviceRows,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              AppStringEM.services,
+                              style: HeadingFormStyle.customTextStyle(context),
                             ),
-                          ),
-                        ],
-                      ),
+                            CustomIconButtonConst(
+                              width: AppSize.s150,
+                              height: AppSize.s32,
+                              text: AppStringEM.addService,
+                              icon: Icons.add,
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) =>
+                                      AddOfficeServicePopup(
+                                    officeId: widget.officeId,
+                                    alreadyAddedServiceIds: serviceDetailsList
+                                        .map((service) => service.serviceId)
+                                        .toList(),
+                                    onServiceAdded: () {
+                                      setState(() {});
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSize.s25),
+                        serviceDetailsList.isEmpty
+                            ? Center(
+                                child: Text(
+                                  ErrorMessageString.noServices,
+                                  style: AllNoDataAvailable.customTextStyle(
+                                      context),
+                                ),
+                              )
+                            : Container(
+                                //color: Colors.purple,
+                                child: Column(
+                                  children: serviceRows,
+                                ),
+                              ),
+                      ],
                     ),
+                  ),
                   SizedBox(height: AppSize.s10),
 
                   /// Button

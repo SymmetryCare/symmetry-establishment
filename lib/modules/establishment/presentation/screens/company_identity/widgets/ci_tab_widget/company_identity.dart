@@ -20,6 +20,7 @@ import 'package:symmetry_establishment/app/resources/font_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/company_identrity_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/company_identity/company_identity_data_.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/add_service_metadata_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/pagination_widget.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
@@ -163,6 +164,22 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                CustomIconButtonConst(
+                  width: AppSize.s150,
+                  height: AppSize.s32,
+                  text: AppStringEM.addService,
+                  icon: Icons.add,
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) =>
+                          AddServiceMetaDataPopup(),
+                    );
+                  },
+                ),
+                SizedBox(
+                  width: AppSize.s35,
+                ),
                 CustomElevatedButton(
                   width: AppSize.s150,
                   height: AppSize.s32,

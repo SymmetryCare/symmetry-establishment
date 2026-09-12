@@ -9,6 +9,8 @@ import 'package:symmetry_establishment/modules/establishment/data/api/managers/e
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/company_identity/company_identity_data_.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/offer_letter_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/taxtfield_constant.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/add_speciality_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/after_clicking_on_link/offer_letter_description_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
@@ -1149,6 +1151,40 @@ class _SpecialityByDeptDropdownState extends State<SpecialityByDeptDropdown> {
     }
   }
 
+  /// Opens the Add Speciality popup and refreshes the list on success, so a
+  /// speciality that is missing can be created without leaving the enroll
+  /// form - including from the "No Speciality Found" dead end.
+  Widget _addSpecialityButton() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 5),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          height: 28,
+          width: 150,
+          child: CustomIconButton(
+            icon: Icons.add,
+            text: 'Add Speciality',
+            textSize: FontSize.s12,
+            color: const Color(0xFF0B8CBF),
+            borderRadius: 24.0,
+            onPressed: () async {
+              await showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AddSpecialityPopup(
+                    onSpecialityAdded: _fetchSpecialities,
+                  );
+                },
+              );
+            },
+            isNotPopUpButton: false,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -1174,30 +1210,42 @@ class _SpecialityByDeptDropdownState extends State<SpecialityByDeptDropdown> {
     }
 
     if (_specialityList.isEmpty) {
-      // No specialities configured for this department
-      return _enrollEmptyDropdown(
-          context, widget.headText, 'No Speciality Found');
+      // No specialities configured yet
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _enrollEmptyDropdown(
+              context, widget.headText, 'No Speciality Found'),
+          _addSpecialityButton(),
+        ],
+      );
     }
 
-    return CustomDropdownTextField(
-      labelStyle: _kEnrollFieldLabelStyle,
-      textStyle: _kEnrollPlaceholderStyle,
-      borderColor: _kEnrollRadioBorder,
-      borderRadius: _kEnrollFieldBorderRadius,
-      boxHeight: _kEnrollFieldBoxHeight,
-      contentPadding: _kEnrollDropdownContentPadding,
-      horiPadding: 5,
-      headText: widget.headText,
-      initialValue: _selectedValue,
-      items: _specialityList.map((e) => e.speciality).toList(),
-      onChanged: (newValue) {
-        for (var item in _specialityList) {
-          if (item.speciality == newValue) {
-            setState(() => _selectedValue = item.speciality);
-            widget.onChanged(item);
-          }
-        }
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomDropdownTextField(
+          labelStyle: _kEnrollFieldLabelStyle,
+          textStyle: _kEnrollPlaceholderStyle,
+          borderColor: _kEnrollRadioBorder,
+          borderRadius: _kEnrollFieldBorderRadius,
+          boxHeight: _kEnrollFieldBoxHeight,
+          contentPadding: _kEnrollDropdownContentPadding,
+          horiPadding: 5,
+          headText: widget.headText,
+          initialValue: _selectedValue,
+          items: _specialityList.map((e) => e.speciality).toList(),
+          onChanged: (newValue) {
+            for (var item in _specialityList) {
+              if (item.speciality == newValue) {
+                setState(() => _selectedValue = item.speciality);
+                widget.onChanged(item);
+              }
+            }
+          },
+        ),
+        _addSpecialityButton(),
+      ],
     );
   }
 }

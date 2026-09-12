@@ -65,6 +65,9 @@ class AppStringEM{
   static const String licensevocnurse = 'license Vocational Nurse';
   static const String nc = 'NC';
   static const String serviceName = 'Service Name';
+  static const String serviceId = 'Service ID';
+  static const String addService = 'Add Service';
+  static const String addNewService = 'Add New Service';
 ///sales
   static const String addemployeetype = 'Add Employee Type';
   static const String adddoctype = 'Add Doctype';
@@ -171,6 +174,8 @@ class ErrorMessageString{
   static const String noMCR =  "No available Medical Cost Reports!";
   static const String noCR =  "No available CAP Reports!";
   static const String noQBR =  "No available quarterly balance reports!";
+  static const String noServices =  "No service added";
+  static const String noServicesAvailable =  "No available services!";
   static const String noVendor =  "No available vendors!";
   static const String noVendorAdded =  "No vendor added";
   static const String noContract =  "No available contracts!";

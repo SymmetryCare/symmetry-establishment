@@ -164,6 +164,11 @@ class EstablishmentManagerRepository {
     return "$companServiceMetaData";
   }
 
+  ///service-metadata/add
+  static String companyServiceMetaDataPost() {
+    return "$companServiceMetaData$add";
+  }
+
   ///insurance-vendor/add
   /////refferals_manager-vendor/add
   static String companyOfficeVendorPost() {

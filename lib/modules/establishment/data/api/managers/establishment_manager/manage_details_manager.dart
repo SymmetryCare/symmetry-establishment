@@ -451,6 +451,39 @@ Future<ServicePreFillData> getAllServicesPrefillData({
 }
 
 
+/// Post new service in service meta data
+Future<ApiData> addServiceMetaData({
+  required BuildContext context,
+  required String serviceName,
+  required String serviceId,
+}) async {
+  try {
+    var response = await Api(context).post(
+        path: EstablishmentManagerRepository.companyServiceMetaDataPost(),
+        data: {
+          "service_name": serviceName,
+          "service_id": serviceId,
+        });
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print("Service meta data added");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: true,
+          message: response.statusMessage!);
+    } else {
+      print("Error 1");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: false,
+          message: response.data['message']);
+    }
+  } catch (e) {
+    print("Error $e");
+    return ApiData(
+        statusCode: 404, success: false, message: AppString.somethingWentWrong);
+  }
+}
+
 /// Get services meta data
 Future<List<ServicesMetaData>> getServicesMetaData(
     BuildContext context,

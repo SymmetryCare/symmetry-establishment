@@ -11,6 +11,11 @@ class ProfileRepository {
   static String race = "/race";
   static String employeeSpeciality = "/employee-speciality";
 
+  /// employee-speciality/add
+  static String addEmployeeSpeciality() {
+    return "$employeeSpeciality/add";
+  }
+
 
   /// search employee profile
   static String searchEmployeeProfileByText({

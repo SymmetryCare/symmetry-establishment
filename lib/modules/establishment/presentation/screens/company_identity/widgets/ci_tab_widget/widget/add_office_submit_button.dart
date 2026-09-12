@@ -22,6 +22,9 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/widgets/dialogue_template.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/company_identity_zone/widgets/location_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/whitelabelling/success_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/add_service_metadata_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/manage_details_manager.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 
 
 class AddOfficeSumbitButton extends StatefulWidget {
@@ -60,11 +63,26 @@ class _AddOfficeSumbitButtonState extends State<AddOfficeSumbitButton> {
   bool isLoading = false;
 
   List<String> _suggestions = [];
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   widget.addressController.addListener(_onCountyNameChanged);
-  // }
+
+  /// Local copy of the service meta data so a newly added service can be
+  /// shown without reopening this popup.
+  List<ServicesMetaData> _servicesList = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _servicesList = List<ServicesMetaData>.from(widget.servicesList);
+    // widget.addressController.addListener(_onCountyNameChanged);
+  }
+
+  Future<void> _refreshServicesList() async {
+    final services = await getServicesMetaData(context);
+    if (!mounted) return;
+    setState(() {
+      _servicesList = services;
+    });
+  }
+
   bool _isDisposed = false;
 
   @override
@@ -263,16 +281,40 @@ class _AddOfficeSumbitButtonState extends State<AddOfficeSumbitButton> {
                         style: CommonErrorMsg.customTextStyle(context),
                       ):SizedBox(height: AppSize.s12,),
                       const SizedBox(height: AppSize.s14),
-                      RichText(
-                        text: TextSpan(
-                          text:"Services", // Main text
-                          style: AllPopupHeadings.customTextStyle(context), // Main style
+                      SizedBox(
+                        width: AppSize.s354,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
-                            TextSpan(
-                              text: ' *', // Asterisk
-                              style: AllPopupHeadings.customTextStyle(context).copyWith(
-                                color: ColorManager.red, // Asterisk color
+                            RichText(
+                              text: TextSpan(
+                                text: AppStringEM.services, // Main text
+                                style: AllPopupHeadings.customTextStyle(context), // Main style
+                                children: [
+                                  TextSpan(
+                                    text: ' *', // Asterisk
+                                    style: AllPopupHeadings.customTextStyle(context).copyWith(
+                                      color: ColorManager.red, // Asterisk color
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            CustomIconButtonConst(
+                              width: AppSize.s150,
+                              height: AppSize.s30,
+                              text: AppStringEM.addNewService,
+                              icon: Icons.add,
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) =>
+                                      AddServiceMetaDataPopup(
+                                    onServiceAdded: _refreshServicesList,
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -289,15 +331,15 @@ class _AddOfficeSumbitButtonState extends State<AddOfficeSumbitButton> {
                               mainAxisAlignment: MainAxisAlignment.start,
                               children: [
                                 Wrap(children: [
-                                  ...List.generate(widget.servicesList.length,
+                                  ...List.generate(_servicesList.length,
                                           (index) {
-                                        String serviceID = widget.servicesList[index].serviceId;
+                                        String serviceID = _servicesList[index].serviceId;
                                         bool isSelected = locationProvider.isSelected(serviceID);
                                         return Container(
                                             width: AppSize.s150,
                                             child: Center(
                                               child: CheckboxTile(
-                                                title: widget.servicesList[index].serviceName,
+                                                title: _servicesList[index].serviceName,
                                                 initialValue: isSelected,
                                                 onChanged: (value) {
                                                   locationProvider.toggleService(serviceID);
@@ -546,7 +588,7 @@ class _AddOfficeSumbitButtonState extends State<AddOfficeSumbitButton> {
               widget.emailController.clear();
               widget.secNumController.clear();
               widget.OptionalController.clear();
-              widget.servicesList.clear();
+              _servicesList.clear();
             } finally {
               locationProvider.clearAllData();
               setState(() {

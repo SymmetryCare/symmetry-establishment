@@ -12,6 +12,7 @@ import 'package:symmetry_establishment/modules/establishment/data/api/managers/h
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/register_enroll_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/after_clicking_on_link/on_boarding_welcome.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/new_popup_with_upload_file.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/add_speciality_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -608,6 +609,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ],
                 );
 
+                final Widget addSpecialityButton = Container(
+                  height: 36,
+                  width: 170,
+                  child: CustomIconButton(
+                    icon: Icons.add,
+                    text: 'Add Speciality',
+                    textSize: FontSize.s15,
+                    color: const Color(0xFF0B8CBF),
+                    borderRadius: 24.0,
+                    onPressed: () async {
+                      await showDialog(
+                        context: context,
+                        builder: (BuildContext context) {
+                          return const AddSpecialityPopup();
+                        },
+                      );
+                    },
+                    isNotPopUpButton: false,
+                  ),
+                );
+
                 final Widget createUserButton = Container(
                   height: 36,
                   width: 160,
@@ -756,6 +778,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                     children: [
                                                       sortDropdown,
                                                       const SizedBox(width: 20),
+                                                      addSpecialityButton,
+                                                      const SizedBox(width: 20),
                                                       createUserButton,
                                                     ],
                                                   ),
@@ -768,6 +792,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                                   searchField,
                                                   const SizedBox(width: 20),
                                                   sortDropdown,
+                                                  const SizedBox(width: 20),
+                                                  addSpecialityButton,
                                                   const SizedBox(width: 20),
                                                   createUserButton,
                                                 ],
