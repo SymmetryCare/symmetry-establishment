@@ -140,6 +140,10 @@ static String postverifyuser(){
     return "$educationdegree";
   }
 
+  static String addEmployeeDegree(){
+    return "$educationdegree/add";
+  }
+
 
   ///prifillapi education
 

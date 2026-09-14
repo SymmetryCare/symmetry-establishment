@@ -6,6 +6,7 @@ import 'package:symmetry_establishment/modules/establishment/data/api/managers/e
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/health.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/emp_doc_popup_const.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/add_degree_popup.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -116,6 +117,22 @@ class ManageEmpDocWidget extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    CustomIconButtonConst(
+                      width: AppSize.s137,
+                      height: AppSize.s30,
+                      text: AppStringEM.addDegree,
+                      icon: Icons.add,
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext context) =>
+                              const AddDegreePopup(),
+                        );
+                      },
+                    ),
+                    SizedBox(
+                      width: AppSize.s20,
+                    ),
                     CustomIconButtonConst(
                      width: AppSize.s137,
                       height: AppSize.s30,

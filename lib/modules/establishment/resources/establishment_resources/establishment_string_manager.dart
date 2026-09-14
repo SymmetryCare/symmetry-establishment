@@ -71,6 +71,8 @@ class AppStringEM{
 ///sales
   static const String addemployeetype = 'Add Employee Type';
   static const String adddoctype = 'Add Doctype';
+  static const String degree = 'Degree';
+  static const String addDegree = 'Add Degree';
   static const String employeetype = 'Employee Type';
   static const String addnewvisit = "Add New Visit";
   static const String visit = "Visit";

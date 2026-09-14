@@ -9,6 +9,7 @@ import 'package:symmetry_establishment/modules/establishment/data/models/hr_modu
 import 'package:symmetry_establishment/presentation/shared/widgets/success_popup.dart';
 import 'package:symmetry_establishment/app/resources/const_string.dart';
 import 'package:symmetry_establishment/app/services/api/api.dart';
+import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/repository/hr_module_repository/form_repository/form_general_repo.dart';
 
 
@@ -239,6 +240,39 @@ Future<List<EducationDataForm>> getEmployeeEducationForm(
   }
 }
 
+
+/// Degree post
+Future<ApiData> addEmployeeDegree({
+  required BuildContext context,
+  required String degree,
+}) async {
+  try {
+    final companyId = await TokenManager.getCompanyId();
+    var response = await Api(context).post(
+        path: ProgressBarRepository.addEmployeeDegree(),
+        data: {
+          "degree": degree,
+          "companyId": companyId,
+        });
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      print("Degree added");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: true,
+          message: response.statusMessage!);
+    } else {
+      print("Degree Error 1");
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: false,
+          message: response.data['message']);
+    }
+  } catch (e) {
+    print("Error $e");
+    return ApiData(
+        statusCode: 404, success: false, message: AppString.somethingWentWrong);
+  }
+}
 
 Future<List<EduactionDegree>> getDegreeDropDown(
     BuildContext context,) async {
