@@ -404,7 +404,13 @@ class AppStringLegalDocument {
   static const String i9 = 'i-9';
   static const String employmentApplication = 'Employment Application';
   static const String w4 = 'W4';
-  static const String employeeHandbook = 'ProHealth-Employee-Handbook';
+  // Renamed from 'ProHealth-Employee-Handbook'. This string is not a label we
+  // choose - it is matched against `formHtmlTemplates.htmlname` from the
+  // tenant's database, so it must stay in step with
+  // `FORM_HTML_TEMPLATES_DATA` in Symmetry-Application-BE, whose spec freezes
+  // it. The seeded HTML is still ProHealth's handbook, kept as a placeholder
+  // each tenant replaces; the name is candidate-facing and could not stay.
+  static const String employeeHandbook = 'Employee-Handbook';
   static const String proHealthCellPhone = "Data-Cell_Agreement";
 
   static const String popupMsgHead = "Kindly fill these following fields.";

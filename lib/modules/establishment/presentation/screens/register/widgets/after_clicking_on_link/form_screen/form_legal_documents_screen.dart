@@ -40,6 +40,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/presentation/shared/widgets/success_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/child_tabbar_screen/documents_child/widgets/acknowledgement_add_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/after_clicking_on_link/form_nine_screen.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/failed_popup.dart';
 
 class LegalDocumentsScreen extends StatefulWidget {
   final int employeeID;
@@ -506,7 +507,24 @@ class _LegalDocumentsScreenState extends State<LegalDocumentsScreen> {
 
     }
     else{
-
+      // Every branch above matches an exact `htmlname` from the tenant's
+      // formHtmlTemplates rows. Reaching here means the database holds a
+      // document this build has no handler for - a renamed seed row, or a
+      // template a tenant added themselves.
+      //
+      // This used to be empty, so the Sign button simply did nothing: no
+      // error, no log, nothing to report. A candidate could sit on a document
+      // that could not be opened and there was no way to tell from the outside
+      // that anything was wrong.
+      debugPrint('No handler for legal document "$htmlName" (template id $id)');
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (_) => const FailedPopup(
+          text: 'This document cannot be opened in this version of the app. '
+              'Please contact your administrator.',
+        ),
+      );
     }
   }
 
