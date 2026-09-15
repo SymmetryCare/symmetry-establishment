@@ -1,1 +1,4 @@
 $.dart_tool/\nbuild/\n.packages\n.flutter-plugins\n.flutter-plugins-dependencies\n*.iml\n.idea/\n.env\n*.log\n.DS_Store\n
+.dart_tool
+build
+.flutter-plugins-dependencies
