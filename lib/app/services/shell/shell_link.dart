@@ -64,10 +64,28 @@ class ShellLink {
   /// mean two login screens on one origin, with the shell's module picker never
   /// entered. Returns null when the caller should navigate in-app as before.
   static void signOutRedirect() {
+    signOutToShell();
+  }
+
+  /// Send a signed-out user to the shell, reporting whether it happened.
+  ///
+  /// Returns **true** when the browser is on its way to the shell and the
+  /// caller must therefore skip its own navigation; **false** standalone,
+  /// where the caller should route to this app's own login screen as before.
+  ///
+  /// The bool is the point. Manual sign-out already branched on
+  /// [isHosted], but session expiry did not: an expired token pushed this
+  /// app's login screen unconditionally, so a shell-hosted user landed on a
+  /// second login form at /hr/ or /establishment/ that the module picker is
+  /// never reached from. Returning the outcome lets every exit share one
+  /// decision instead of each remembering to ask.
+  ///
+  /// replace, not assign: a signed-out session must not be reachable by
+  /// pressing Back.
+  static bool signOutToShell() {
     final String? url = shellUrl;
-    if (url == null) return;
-    // replace, not assign: a signed-out session must not be reachable by
-    // pressing Back.
+    if (url == null) return false;
     html.window.location.replace(url);
+    return true;
   }
 }
