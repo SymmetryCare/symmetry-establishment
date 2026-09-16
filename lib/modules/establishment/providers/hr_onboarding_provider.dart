@@ -82,6 +82,28 @@ class HrOnboardingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Manual refresh: re-queries the list from the API and re-applies the
+  /// search text and sort the screen currently has, so pressing Refresh
+  /// doesn't silently drop either the way a plain [getStreamData] would.
+  void refreshData(BuildContext context, {String searchText = ''}) {
+    // Any search the user typed a moment ago is about to be superseded by
+    // this request, so drop the pending debounce instead of letting it fire
+    // a second, identical query right after.
+    _searchDebounce?.cancel();
+    getEmployeeSeeAll(context, searchText: searchText).then((data) {
+      _allData = data
+          .where((item) =>
+              item.status == 'Partial' ||
+              item.status == 'Enrolled' ||
+              item.status == 'Completed')
+          .toList();
+      filterData();
+    }).catchError((error) {
+      debugPrint('Error refreshing onboarding data: $error');
+    });
+    notifyListeners();
+  }
+
   // NEW: search directly via API using provided searchText
   void searchData(BuildContext context, String searchText) {
     _searchDebounce?.cancel();

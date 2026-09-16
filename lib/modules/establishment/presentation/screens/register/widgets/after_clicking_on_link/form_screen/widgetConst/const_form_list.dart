@@ -10,7 +10,12 @@ import 'package:symmetry_establishment/app/resources/font_manager.dart';
 
 class DefineFormList extends StatelessWidget {
   final String formName;
-  final VoidCallback? onSigned;
+
+  /// Fetches the document and opens it for signing. Awaitable rather than a
+  /// plain VoidCallback so the Sign button can stay disabled, showing a
+  /// spinner, for as long as that is in flight — it is a network round trip
+  /// followed by a push, and every extra tap used to start another one.
+  final Future<void> Function()? onSigned;
   final VoidCallback onView;
   final bool isSigned;
   final bool isHandbook;
@@ -131,15 +136,68 @@ class DefineFormList extends StatelessWidget {
                 )
                 : Container(
               width: 90,
-                  child: ElevatedButton(
-                                onPressed: onSigned, // Button only shown if not signed
-                                child: Text('Sign',
-                                style: BlueButtonTextConst.customTextStyle(context),
-                                ),),
+                  child: _SignButton(onSigned: onSigned),
                               ),
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The Sign button for one row. It owns its own in-flight flag so that the
+/// row being signed is the only one that changes — the list renders one of
+/// these per legal document.
+///
+/// While [onSigned] is running the button is disabled and shows a spinner
+/// in place of its label, which is what stops a second tap starting a second
+/// fetch and stacking a second signature screen on top of the first. Its
+/// geometry is unchanged either way, so the row doesn't jump.
+class _SignButton extends StatefulWidget {
+  const _SignButton({required this.onSigned});
+
+  final Future<void> Function()? onSigned;
+
+  @override
+  State<_SignButton> createState() => _SignButtonState();
+}
+
+class _SignButtonState extends State<_SignButton> {
+  bool _isSigning = false;
+
+  Future<void> _handleTap() async {
+    final Future<void> Function()? onSigned = widget.onSigned;
+    if (_isSigning || onSigned == null) return;
+
+    setState(() => _isSigning = true);
+    try {
+      await onSigned();
+    } finally {
+      // The callback pushes the signature screen rather than awaiting it, so
+      // this lands once the document is on screen. The row may also have been
+      // rebuilt out from under us by the refreshed form status.
+      if (mounted) setState(() => _isSigning = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = widget.onSigned != null && !_isSigning;
+    return ElevatedButton(
+      onPressed: enabled ? _handleTap : null,
+      child: _isSigning
+          ? const SizedBox(
+              height: 16,
+              width: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            )
+          : Text(
+              'Sign',
+              style: BlueButtonTextConst.customTextStyle(context),
+            ),
     );
   }
 }

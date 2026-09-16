@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/hr_register_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/register/widgets/after_clicking_on_link/thank_you_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/refresh_icon_button.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
@@ -58,6 +59,21 @@ class MultiStepForm extends StatefulWidget {
 class _MultiStepFormState extends State<MultiStepForm> {
   final ScrollController _horizontalScrollController = ScrollController();
 
+  /// One token per step index, bumped by the Refresh button in the header.
+  /// A step's token is part of the key its content is wrapped in below, so
+  /// bumping it tears that content down and inflates it again — which is
+  /// what re-runs the API calls the step makes from its own initState (its
+  /// dropdowns, and the prefill of whatever the employee saved earlier).
+  ///
+  /// The tokens are per step, not one for the form, because a horizontal
+  /// Stepper keeps every step's content mounted behind a Visibility and
+  /// only hides the ones off screen. A single shared token would therefore
+  /// remount all of them and throw away unsaved edits across the whole
+  /// form; this way Refresh only touches the step being looked at. That
+  /// step's own unsaved edits are discarded, as they would be by the full
+  /// browser reload this replaces.
+  final Map<int, int> _refreshTokens = <int, int>{};
+
   double textFieldWidth = 430;
   double textFieldHeight = 38;
 
@@ -87,6 +103,33 @@ class _MultiStepFormState extends State<MultiStepForm> {
     super.dispose();
   }
 
+  void _refreshCurrentStep() {
+    setState(() {
+      _refreshTokens[_currentStep] = (_refreshTokens[_currentStep] ?? 0) + 1;
+    });
+  }
+
+  /// Re-wraps each step's content in a subtree keyed on that step's entry in
+  /// [_refreshTokens], so pressing Refresh remounts it. Done here rather
+  /// than at each of the ~20 call sites in [steps] so the two step lists
+  /// stay as they are.
+  List<Step> _refreshable(List<Step> raw) {
+    return <Step>[
+      for (int i = 0; i < raw.length; i++)
+        Step(
+          title: raw[i].title,
+          subtitle: raw[i].subtitle,
+          label: raw[i].label,
+          state: raw[i].state,
+          isActive: raw[i].isActive,
+          content: KeyedSubtree(
+            key: ValueKey('onboarding-step-$i-${_refreshTokens[i] ?? 0}'),
+            child: raw[i].content,
+          ),
+        ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return isCompleted
@@ -109,12 +152,23 @@ class _MultiStepFormState extends State<MultiStepForm> {
             Padding(
               padding: const EdgeInsets.all(10),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    "Details",
-                    style: FormHeading.customTextStyle(context),
+                  // Balances the button opposite so "Details" stays on the
+                  // row's centre line rather than being pushed left by it.
+                  const SizedBox(width: 48),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        "Details",
+                        style: FormHeading.customTextStyle(context),
+                      ),
+                    ),
                   ),
+                  RefreshIconButton(
+                    tooltip: 'Refresh this section',
+                    onPressed: _refreshCurrentStep,
+                  ),
+                  const SizedBox(width: 12),
                 ],
               ),
             ),
@@ -907,9 +961,9 @@ class _MultiStepFormState extends State<MultiStepForm> {
     ];
 
     if (widget.depID == FrontendConfigStore.data?.config.clinicalId) {
-      return stepsList;
+      return _refreshable(stepsList);
     } else {
-      return stepsLista;
+      return _refreshable(stepsLista);
     }
   }
 }

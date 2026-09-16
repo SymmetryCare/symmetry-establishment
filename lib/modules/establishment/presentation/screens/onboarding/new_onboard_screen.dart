@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/hr_onboarding_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/refresh_icon_button.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/onboarding/widgets/banking_tab.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/onboarding/widgets/form_status.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/onboarding/widgets/genaral_tab.dart';
@@ -100,10 +101,35 @@ class OnboardingTabManage extends StatefulWidget {
 class _OnboardingTabManageState extends State<OnboardingTabManage> {
   final ScrollController _horizontalScrollController = ScrollController();
 
+  /// One token per PageView page, bumped by the header's Refresh button.
+  /// Each token is part of its page's key, so bumping one tears that page
+  /// down and inflates it again — which is what re-runs the fetches its
+  /// widgets kick off from their own initState. The PageView keeps every
+  /// page alive, so without this a page only ever loads its dropdowns and
+  /// prefilled data once. Keeping the tokens per page means refreshing the
+  /// section on screen leaves the others as they were.
+  final List<int> _refreshTokens = List<int>.filled(6, 0, growable: false);
+
   @override
   void dispose() {
     _horizontalScrollController.dispose();
     super.dispose();
+  }
+
+  void _refreshSection() {
+    final int index = widget.selectedIndex;
+    if (index < 0 || index >= _refreshTokens.length) return;
+    setState(() => _refreshTokens[index]++);
+  }
+
+  /// Wraps a PageView page so [_refreshSection] can remount it on demand.
+  Widget _page(int index, Widget child) {
+    return KeyedSubtree(
+      key: ValueKey(
+        'onboarding-page-$index-${widget.employeeId}-${_refreshTokens[index]}',
+      ),
+      child: child,
+    );
   }
 
   @override
@@ -223,6 +249,11 @@ class _OnboardingTabManageState extends State<OnboardingTabManage> {
                                                 widget.employeeName,
                                                 style: CompanyIdentityManageHeadings.customTextStyle(context),
                                               ),
+                                              const SizedBox(width: AppSize.s20,),
+                                              RefreshIconButton(
+                                                tooltip: 'Refresh this section',
+                                                onPressed: _refreshSection,
+                                              ),
                                             ],
                                           ),
                                         ),
@@ -306,12 +337,12 @@ class _OnboardingTabManageState extends State<OnboardingTabManage> {
                         controller: widget.managePageController,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          OnboardingGeneral(selectButton: widget.selectButton, goBackButtion: widget.onBackPressed),
-                          OnboardingQualification(employeeId: widget.employeeId, departmentId: widget.departmentId,),
-                          Banking(employeeId: widget.employeeId,),
-                          HealthRecord(employeeId: widget.employeeId,),
-                          Acknowledgement(employeeId: widget.employeeId,),
-                          FormStatusScreen(employeeId: widget.employeeId,),
+                          _page(0, OnboardingGeneral(selectButton: widget.selectButton, goBackButtion: widget.onBackPressed)),
+                          _page(1, OnboardingQualification(employeeId: widget.employeeId, departmentId: widget.departmentId,)),
+                          _page(2, Banking(employeeId: widget.employeeId,)),
+                          _page(3, HealthRecord(employeeId: widget.employeeId,)),
+                          _page(4, Acknowledgement(employeeId: widget.employeeId,)),
+                          _page(5, FormStatusScreen(employeeId: widget.employeeId,)),
                         ],
                       ),
                     ),

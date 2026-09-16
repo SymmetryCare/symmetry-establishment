@@ -19,6 +19,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/pagination_widget.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/hr_onboarding_provider.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/refresh_icon_button.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 
 /// ── Onboarding table metrics ────────────────────────────────────────────
@@ -606,6 +607,16 @@ class _OnboardingGeneralState extends State<OnboardingGeneral> {
                                             const SizedBox(width: 12),
                                             _buildSortDropdown(context,
                                                 onboardingState, displayTextMap),
+                                            const SizedBox(width: 8),
+                                            RefreshIconButton(
+                                              tooltip: 'Refresh onboarding list',
+                                              onPressed: () =>
+                                                  onboardingState.refreshData(
+                                                context,
+                                                searchText:
+                                                    _searchController.text,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                         const SizedBox(height: 33),

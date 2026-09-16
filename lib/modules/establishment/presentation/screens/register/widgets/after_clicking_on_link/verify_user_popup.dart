@@ -136,6 +136,9 @@ class VerifyUserpopupState extends State<VerifyUserpopup> {
   bool isLoading = false;
   bool isOtpLoading = false;
 
+  /// True from the moment Resend is tapped until that request comes back.
+  bool _isResendingOtp = false;
+
   bool _isEmailValid(String email) {
     return RegExp(r'^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$').hasMatch(email);
   }
@@ -177,6 +180,48 @@ class VerifyUserpopupState extends State<VerifyUserpopup> {
       setState(() {
         isLoading = false;
       });
+    }
+  }
+
+  /// Resend, with the two gaps that let a user fire off codes back to back
+  /// both closed: a second tap arriving while the first request is still in
+  /// flight, and a tap landing before the cooldown a previous send started
+  /// has been painted over the link.
+  ///
+  /// The cooldown is started up front rather than when the reply lands, so
+  /// the link is out of reach for the whole round trip. If the send fails
+  /// nothing went out, so the cooldown is dropped again and the link comes
+  /// straight back — [postverifyuser] has already shown the reason.
+  Future<void> _resendOtp() async {
+    if (_isResendingOtp || _remainingTime > 0) return;
+
+    setState(() {
+      _isResendingOtp = true;
+      _remainingTime = 59;
+      _errorMessage = "";
+    });
+    _startTimer();
+
+    final ApiData result = await postverifyuser(context, emailController.text);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isResendingOtp = false;
+      if (result.success) {
+        // The code in the boxes is dead now that a new one has gone out —
+        // clearing them stops it being submitted against the new code.
+        for (final controller in otpControllers) {
+          controller.clear();
+        }
+      } else {
+        _timer?.cancel();
+        _remainingTime = 0;
+      }
+    });
+
+    if (result.success) {
+      FocusScope.of(context).requestFocus(_focusNodes[0]);
     }
   }
 
@@ -437,11 +482,7 @@ class VerifyUserpopupState extends State<VerifyUserpopup> {
                                     splashColor: Colors.transparent,
                                     highlightColor: Colors.transparent,
                                     hoverColor: Colors.transparent,
-                                    onTap: () async {
-                                      await postverifyuser(context, emailController.text);
-                                      _remainingTime = 59;
-                                      _startTimer();
-                                    },
+                                    onTap: _isResendingOtp ? null : _resendOtp,
                                     child: Text(
                                       'Resend OTP',
                                       style: TextStyle(
