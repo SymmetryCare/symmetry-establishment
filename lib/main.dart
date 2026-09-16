@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/app/resources/provider/version_provider.dart';
 import 'package:symmetry_establishment/app/services/config/error_surface.dart';
 import 'package:symmetry_establishment/app/services/config/frontend_config_boot.dart';
+import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
 import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/data/navigator_arguments/screen_arguments.dart';
