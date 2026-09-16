@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
+import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
 
 class Api {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -219,11 +220,18 @@ class Api {
     TokenManager.removeAccessToken();
     if (!_isNavigatingToLogin) {
       _isNavigatingToLogin = true;
-      Navigator.pushNamedAndRemoveUntil(
-        _buildContext,
-        LoginScreen.routeName,
-            (route) => false,
-      );
+      // Shell-hosted, the login screen belongs to the shell. This used to push
+      // this app's own login screen unconditionally, so an expired session
+      // stranded the user on a second login form on the same origin, with the
+      // module picker never entered. Manual sign-out already branched this
+      // way; expiry did not.
+      if (!ShellLink.signOutToShell()) {
+        Navigator.pushNamedAndRemoveUntil(
+          _buildContext,
+          LoginScreen.routeName,
+              (route) => false,
+        );
+      }
     }
     handler.next(error);
   }

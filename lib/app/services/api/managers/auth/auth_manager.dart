@@ -9,6 +9,7 @@ import 'package:symmetry_establishment/data/api_data/api_data.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/app/resources/const_string.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/hr_module_manager/progress_form_manager/offer_letter_manager.dart';
+import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
 
 class AuthManager {
   ///Sign in with Email.
@@ -425,8 +426,12 @@ class AuthManager {
       print(response);
       if (response.statusCode == 201 || response.statusCode == 200) {
         TokenManager.removeAccessToken();
-        Navigator.pushNamedAndRemoveUntil(
-            context, LoginScreen.routeName, (route) => false);
+        // Same rule as every other exit: the shell owns the login screen when
+        // this build is hosted behind it.
+        if (!ShellLink.signOutToShell()) {
+          Navigator.pushNamedAndRemoveUntil(
+              context, LoginScreen.routeName, (route) => false);
+        }
         // Navigator.pushNamed(context, HomeScreen.routeName);
 
         return ApiData(

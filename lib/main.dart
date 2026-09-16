@@ -153,12 +153,12 @@ class EstablishmentApplication extends StatelessWidget {
       case LoginScreen.routeName:
         // Logout and session-expiry both land here; the session is gone.
         _hasSession = false;
-        page = const LoginScreen();
+        page = _loginOrShell();
         break;
       case EmailVerification.routeName:
         final email = _emailFrom(settings.arguments);
         page = email == null
-            ? const LoginScreen()
+            ? _loginOrShell()
             : EmailVerification(email: email);
         break;
       case ForgetPassword.routeName:
@@ -167,14 +167,29 @@ class EstablishmentApplication extends StatelessWidget {
       case VerifyPassword.routeName:
         final email = _emailFrom(settings.arguments);
         page =
-            email == null ? const LoginScreen() : VerifyPassword(email: email);
+            email == null ? _loginOrShell() : VerifyPassword(email: email);
         break;
       default:
-        page = _hasSession ? ResponsiveScreenEM() : const LoginScreen();
+        page = _hasSession ? ResponsiveScreenEM() : _loginOrShell();
         break;
     }
 
     return MaterialPageRoute<void>(builder: (_) => page, settings: settings);
+  }
+
+  /// This app's own login screen, or a redirect to the shell's when hosted.
+  ///
+  /// Every route above that would otherwise render a login form goes through
+  /// here, so a shell-hosted build never shows a second login form on the same
+  /// origin. The redirect is synchronous, so the empty widget is on screen
+  /// only until the browser navigates.
+  ///
+  /// Routes that are meant to work signed-out on their own -- the onboarding
+  /// deep link a candidate opens from an emailed link, which carries no
+  /// session at all -- have their own cases and never reach this.
+  Widget _loginOrShell() {
+    if (ShellLink.signOutToShell()) return const SizedBox.shrink();
+    return const LoginScreen();
   }
 
   String? _emailFrom(Object? arguments) {
