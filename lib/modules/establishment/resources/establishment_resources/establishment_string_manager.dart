@@ -212,11 +212,13 @@ class ErrorMessageString{
  static const String noserviceAdded = "No service added";
  static const String noroleAdded = "No role added";
  static const String noEmployeType= "No Employee Type";
+ static const String noDegree = "No available degree!";
 }
 ///edit
 class EditPopupString{
   static const String editEmptype = 'Edit Employee Type';
   static const String editDocument = 'Edit Document';
+  static const String editDegree = 'Edit Degree';
   static const String editholiday = 'Edit Holiday';
 
   static const String editPolicy = 'Edit Policies & Procedure';
@@ -236,6 +238,7 @@ class EditPopupString{
 class DeletePopupString{
   static const String deleteEmpType = 'Delete Employee Type';
   static const String deleteDocument =  'Delete Document';
+  static const String deleteDegree =  'Delete Degree';
   static const String deleteholiday =   'Delete Holiday';
   static const String deleteworkShift = 'Delete Work Shift';
   static const String deleteworkWeek = 'Delete Work Weeks';

@@ -7,6 +7,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/emp_doc_popup_const.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/add_degree_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/degree_list.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -94,6 +95,11 @@ class ManageEmpDocProvider with ChangeNotifier {
 }
 
 class ManageEmpDocWidget extends StatelessWidget {
+  /// Index of the Degree tab — the last tab, which lists the company's degrees
+  /// instead of a document type.
+  static const int degreeTabIndex = 7;
+  static const int tabCount = 8;
+
   final PageController managePageController;
   final Function(int) selectButton;
 
@@ -105,7 +111,13 @@ class ManageEmpDocWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ManageEmpDocProvider>(
+    return ChangeNotifierProvider<DegreeListProvider>(
+      create: (context) {
+        final degreeProvider = DegreeListProvider();
+        degreeProvider.init(context);
+        return degreeProvider;
+      },
+      child: Consumer<ManageEmpDocProvider>(
       builder: (context, provider, child) {
         return Material(
           color: Colors.white,
@@ -123,16 +135,22 @@ class ManageEmpDocWidget extends StatelessWidget {
                       text: AppStringEM.addDegree,
                       icon: Icons.add,
                       onPressed: () {
+                        final degreeProvider =
+                            context.read<DegreeListProvider>();
                         showDialog(
                           context: context,
-                          builder: (BuildContext context) =>
-                              const AddDegreePopup(),
+                          builder: (BuildContext dialogContext) =>
+                              AddDegreePopup(
+                            onDegreeAdded: () =>
+                                degreeProvider.fetchDegrees(context),
+                          ),
                         );
                       },
                     ),
                     SizedBox(
                       width: AppSize.s20,
                     ),
+                    if (provider.selectedIndex != degreeTabIndex)
                     CustomIconButtonConst(
                      width: AppSize.s137,
                       height: AppSize.s30,
@@ -190,7 +208,7 @@ class ManageEmpDocWidget extends StatelessWidget {
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(7, (index) {
+                    children: List.generate(tabCount, (index) {
                       return InkWell(
                         hoverColor: Colors.transparent,
                         splashColor: Colors.transparent,
@@ -202,7 +220,7 @@ class ManageEmpDocWidget extends StatelessWidget {
                         },
                         child: Container(
                           height: AppSize.s30,
-                          width: MediaQuery.of(context).size.width / 8.422,
+                          width: MediaQuery.of(context).size.width / 9.62,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(20),
                             color: provider.selectedIndex == index
@@ -272,7 +290,10 @@ class ManageEmpDocWidget extends StatelessWidget {
                         provider.selectButton(index);
                       },
                       physics: const NeverScrollableScrollPhysics(),
-                      children: List.generate(7, (index) {
+                      children: List.generate(tabCount, (index) {
+                        if (index == degreeTabIndex) {
+                          return const DegreeList();
+                        }
                         return ChangeNotifierProvider(
                             create: (_) => HealthEmpDocProvider(metaDocID: _getDocIdForTab(index)),
                             child: HealthEmpDoc(metaDocID: _getDocIdForTab(index)));
@@ -287,6 +308,7 @@ class ManageEmpDocWidget extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 
@@ -306,6 +328,8 @@ class ManageEmpDocWidget extends StatelessWidget {
         return AppStringEM.compensation;
       case 6:
         return AppStringEM.performance;
+      case degreeTabIndex:
+        return AppStringEM.degree;
       default:
         return '';
     }

@@ -12,22 +12,38 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/four_not_four_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 
-/// Popup to add a degree for the company.
-/// Posts to `/employee-degree/add`, the list the Degree dropdown in the
-/// employee education form is built from.
+/// Popup to add or edit a degree for the company.
+///
+/// With no [degreeId] it posts to `/employee-degree/add`; with one it patches
+/// `/employee-degree/{degreeId}`. Either way it maintains the list the Degree
+/// dropdown in the employee education form is built from.
 class AddDegreePopup extends StatefulWidget {
-  const AddDegreePopup({super.key, this.onDegreeAdded});
+  const AddDegreePopup({
+    super.key,
+    this.onDegreeAdded,
+    this.degreeId,
+    this.initialDegree,
+  });
 
-  /// Called after a degree is added successfully, so the caller can refresh
-  /// its degree list.
+  /// Called after a degree is added or updated successfully, so the caller can
+  /// refresh its degree list.
   final VoidCallback? onDegreeAdded;
+
+  /// The degree being edited. `null` puts the popup in add mode.
+  final int? degreeId;
+
+  /// Current degree name, prefilled when editing.
+  final String? initialDegree;
 
   @override
   State<AddDegreePopup> createState() => _AddDegreePopupState();
 }
 
 class _AddDegreePopupState extends State<AddDegreePopup> {
-  TextEditingController degreeController = TextEditingController();
+  late final TextEditingController degreeController =
+      TextEditingController(text: widget.initialDegree ?? '');
+
+  bool get _isEdit => widget.degreeId != null;
 
   bool _isFormValid = true;
   String? _degreeError;
@@ -45,6 +61,12 @@ class _AddDegreePopupState extends State<AddDegreePopup> {
     });
   }
 
+  @override
+  void dispose() {
+    degreeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _addDegree() async {
     _validateForm(); // Validate the form on button press
 
@@ -55,10 +77,16 @@ class _AddDegreePopupState extends State<AddDegreePopup> {
       _isLoading = true;
     });
     try {
-      ApiData response = await addEmployeeDegree(
-        context: context,
-        degree: degreeController.text.trim(),
-      );
+      ApiData response = _isEdit
+          ? await editEmployeeDegree(
+              context: context,
+              degreeId: widget.degreeId!,
+              degree: degreeController.text.trim(),
+            )
+          : await addEmployeeDegree(
+              context: context,
+              degree: degreeController.text.trim(),
+            );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         Navigator.pop(context);
@@ -66,9 +94,13 @@ class _AddDegreePopupState extends State<AddDegreePopup> {
         showDialog(
           context: context,
           builder: (BuildContext context) {
-            return AddSuccessPopup(
-              message: 'Degree added successfully.',
-            );
+            return _isEdit
+                ? EditSuccessPopup(
+                    message: 'Degree updated successfully.',
+                  )
+                : AddSuccessPopup(
+                    message: 'Degree added successfully.',
+                  );
           },
         );
       } else if (response.statusCode == 400 || response.statusCode == 404) {
@@ -99,7 +131,7 @@ class _AddDegreePopupState extends State<AddDegreePopup> {
     return DialogueTemplate(
       width: AppSize.s400,
       height: AppSize.s250,
-      title: AppStringEM.addDegree,
+      title: _isEdit ? EditPopupString.editDegree : AppStringEM.addDegree,
       body: [
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppPadding.p12),
@@ -139,7 +171,7 @@ class _AddDegreePopupState extends State<AddDegreePopup> {
           : CustomElevatedButton(
               width: AppSize.s105,
               height: AppSize.s30,
-              text: AppStringEM.add,
+              text: _isEdit ? AppStringEM.save : AppStringEM.add,
               onPressed: _addDegree,
             ),
     );

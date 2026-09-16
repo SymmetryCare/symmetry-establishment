@@ -144,6 +144,14 @@ static String postverifyuser(){
     return "$educationdegree/add";
   }
 
+  static String patchEmployeeDegree({required int degreeId}){
+    return "$educationdegree/$degreeId";
+  }
+
+  static String deleteEmployeeDegree({required int degreeId}){
+    return "$educationdegree/$degreeId";
+  }
+
 
   ///prifillapi education
 
