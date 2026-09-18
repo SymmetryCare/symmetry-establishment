@@ -25,6 +25,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/hr_clinitian_tab.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/hr_salesAdmin_tab.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
+import 'package:symmetry_establishment/app/services/config/department_ids.dart';
 
 /// stl conversion
 class HrScreenProvider with ChangeNotifier {
@@ -254,11 +255,25 @@ class HrWidget extends StatelessWidget {
                             //     : provider.selectedIndex == 1
                             //     ? AppConfig.salesId
                             //     : AppConfig.AdministrationId;
+                            // Resolved from this tenant's own Department
+                            // table, not from the global config's ids. They
+                            // are not the same: on prohealth the config's
+                            // salesId is 2, which is Administration there, so
+                            // a type added under the Sales tab landed in
+                            // Administration and the person who needed it
+                            // never saw it. Falls back to the config id when
+                            // the tenant's departments could not be loaded.
                             provider._deptId = provider.selectedIndex == 0
-                                ? FrontendConfigStore.data!.config.clinicalId
+                                ? DepartmentIds.idFor('Clinical',
+                                    fallback: FrontendConfigStore
+                                        .data!.config.clinicalId)
                                 : provider.selectedIndex == 1
-                                ? FrontendConfigStore.data!.config.salesId
-                                : FrontendConfigStore.data!.config.administrationId;
+                                ? DepartmentIds.idFor('Sales',
+                                    fallback: FrontendConfigStore
+                                        .data!.config.salesId)
+                                : DepartmentIds.idFor('Administration',
+                                    fallback: FrontendConfigStore
+                                        .data!.config.administrationId);
                             provider.typeController.clear();
                             provider.shorthandController.clear();
                             showDialog(
@@ -400,15 +415,15 @@ class HrWidget extends StatelessWidget {
                     children: [
                       ChangeNotifierProvider(
                           create: (_) => HRTabScreenProvider(),
-                          child: HRTabScreens(deptId: FrontendConfigStore.data!.config.clinicalId)),
+                          child: HRTabScreens(deptId: DepartmentIds.idFor('Clinical', fallback: FrontendConfigStore.data!.config.clinicalId))),
                           // child: HRTabScreens(deptId: AppConfig.clinicalId)),
                       ChangeNotifierProvider(
                           create: (_) => HRTabScreenProvider(),
-                          child: HRSalesAdminTabScreens(deptId: FrontendConfigStore.data!.config.salesId)),
+                          child: HRSalesAdminTabScreens(deptId: DepartmentIds.idFor('Sales', fallback: FrontendConfigStore.data!.config.salesId))),
                           // child: HRTabScreens(deptId: AppConfig.salesId)),
                       ChangeNotifierProvider(
                           create: (_) => HRTabScreenProvider(),
-                          child: HRSalesAdminTabScreens(deptId: FrontendConfigStore.data!.config.administrationId)),
+                          child: HRSalesAdminTabScreens(deptId: DepartmentIds.idFor('Administration', fallback: FrontendConfigStore.data!.config.administrationId))),
                           // child: HRTabScreens(deptId: AppConfig.AdministrationId)),
                     ],
                   ),

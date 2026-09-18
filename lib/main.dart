@@ -30,6 +30,8 @@ import 'package:symmetry_establishment/presentation/screens/login_module/email_v
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_pass_verification/forget_pass_verification.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
+import 'package:symmetry_establishment/app/services/config/department_ids.dart';
+import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/all_from_hr_manager.dart';
 
 /// Global navigator key. The app bar reaches for it, and the post-first-frame
 /// frontend-config refresh needs a `BuildContext` that outlives any one screen.
@@ -130,6 +132,24 @@ class EstablishmentApplication extends StatelessWidget {
           // Replace the cached/default config with the live one once there is
           // a context to make the call with.
           FrontendConfigBoot.refreshInBackground(navigatorKey);
+          // And this tenant's own department ids, which the global
+          // config above does NOT supply — its clinicalId/salesId/
+          // administrationId are the same for every tenant, while
+          // Department.DepartmentId is per-tenant and need not match.
+          // Warmed here so the screens that need it have it; every
+          // lookup falls back to the configured id regardless.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final ctx = navigatorKey.currentState?.context;
+            if (ctx != null) {
+              // companyHRHeadApi takes a deptId it only prints — the
+              // endpoint behind it (getHrType) lists every department
+              // and takes no id — so the 0 here is ignored.
+              DepartmentIds.ensureLoaded(
+                ctx,
+                (c) => companyHRHeadApi(c, 0),
+              );
+            }
+          });
           return child ?? const SizedBox.shrink();
         },
       ),
