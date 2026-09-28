@@ -71,6 +71,21 @@ class Api {
             message = response.data['message']?.toString();
           }
 
+          // A session minted for a different company. Every tenant verifies
+          // with the same platform key, so this token is well-formed here --
+          // the server rejects it on whose data it asks for, not on its shape.
+          //
+          // Refreshing cannot rescue it: a new token carries the same company
+          // and is refused identically, after spending a rotation. So end the
+          // session here rather than let the usual 401 path try. This is what
+          // a user sees when they edit the hostname in the address bar: they
+          // land back at sign-in, not on somebody else's data.
+          if (response.data is Map &&
+              response.data['error']?.toString() == 'TENANT_MISMATCH') {
+            print('Session belongs to another organization - signing out');
+            return _forceLogout(handler, error);
+          }
+
           final isUnauthorized =
               response.statusCode == 401 || message == 'Unauthorized';
 
