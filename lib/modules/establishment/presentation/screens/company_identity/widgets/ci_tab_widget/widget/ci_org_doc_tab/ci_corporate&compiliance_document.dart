@@ -8,12 +8,19 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/ci_org_doc_tab/widgets/ci_corporate&compiliancedoc_tab/ci_ccd_medical_cost_report.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/ci_org_doc_tab/widgets/ci_corporate&compiliancedoc_tab/ci_ccd_quarterly_balance_report.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 
 class CICorporateComplianceState with ChangeNotifier {
-  int _selectedIndex = 0;
+  /// [initialIndex] is the sub-tab the URL opened the page on.
+  CICorporateComplianceState({int initialIndex = 0})
+      : _selectedIndex = initialIndex {
+    _selectedSubDocType = getSubDocTypeForIndex(initialIndex);
+  }
+
+  int _selectedIndex;
   String _selectedSubDocType = "";
 
   String get selectedSubDocType => _selectedSubDocType;
@@ -70,21 +77,48 @@ class CICorporateCompilianceDocument extends StatelessWidget {
   final Function(int) onSubDocIdSelected;
   final String selectedSubDocType;
 
+  /// The sub-tab the URL names (Licenses ... Quarterly Balance Reports).
+  final int initialSubTab;
+
+  /// A sub-tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onSubTabChanged;
+
   const CICorporateCompilianceDocument({
     Key? key,
     required this.docID,
     required this.onSubDocIdSelected,
     required this.selectedSubDocType,
+    this.initialSubTab = 0,
+    this.onSubTabChanged,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final pageController = PageController();
+    final pageController = PageController(initialPage: initialSubTab);
 
     return ChangeNotifierProvider(
-      create: (_) => CICorporateComplianceState(),
+      create: (_) => CICorporateComplianceState(initialIndex: initialSubTab),
       child: Consumer<CICorporateComplianceState>(
         builder: (context, corporateState, child) {
+          return RouteTabSync(
+            tab: initialSubTab,
+            onTabChanged: (int subTab) {
+              if (corporateState.selectedIndex == subTab) return;
+              // The post-frame sync below moves the PageView to it.
+              corporateState.setSelectedIndex(subTab);
+              onSubDocIdSelected(corporateState.getSubDocIdForIndex(subTab));
+            },
+            child: _buildTabs(context, corporateState, pageController),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTabs(BuildContext context,
+      CICorporateComplianceState corporateState, PageController pageController) {
+    return Builder(
+        builder: (context) {
           // Sync PageController with selectedIndex
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (pageController.hasClients &&
@@ -143,6 +177,7 @@ class CICorporateCompilianceDocument extends StatelessWidget {
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
                               );
+                              onSubTabChanged?.call(index);
                             },
                           ),
                       ],
@@ -205,7 +240,6 @@ class CICorporateCompilianceDocument extends StatelessWidget {
             ],
           );
         },
-      ),
     );
   }
 }

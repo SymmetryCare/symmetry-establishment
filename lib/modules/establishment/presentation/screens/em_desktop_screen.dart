@@ -1,42 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:go_router/go_router.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
-import 'package:symmetry_establishment/app/services/tab_memory.dart';
-import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
+import 'package:symmetry_establishment/app/router/em_routes.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/em_dashboard_string_manager.dart';
 import 'package:symmetry_establishment/app/resources/font_manager.dart';
-import 'package:symmetry_establishment/modules/establishment/providers/em_main_provider.dart';
-import 'package:symmetry_establishment/modules/establishment/providers/navigation_provider.dart';
-import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/company_identity.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/manage_emp_doc.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/manage_work_schedule.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/see_all_screen/see_all_provider.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/see_all_screen/see_all_screen.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/dashboard/dashboard_main_button_screen.dart';
-import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/company_identrity_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/app_bar/app_bar.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/const_appbar/controller.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/bottom_row.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/ci_org_document.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/ci_role_manager.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/ci_visit.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/hr_screen.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_pay_rates/finance_screen.dart';
 
-// ✅ UPDATED: Changed from StatelessWidget to StatefulWidget
+/// The Establishment header (Dashboard, Company Identity, the module
+/// dropdown), the current page under it, and the footer.
+///
+/// The pages used to sit in a PageView here, switched by index and restored
+/// from sessionStorage on refresh. Each is now its own URL (see
+/// app/router/em_routes.dart): the header navigates, and the router hands the
+/// page in as [child].
 class EMDesktopScreen extends StatefulWidget {
-  final String? dropdownValue;
-  final ValueChanged<String?>? onChanged;
-  final VoidCallback? onItem2Selected;
+  /// The page the URL names, for the header's highlight and dropdown label.
+  final EmPage page;
+
+  /// That page's screen.
+  final Widget child;
 
   const EMDesktopScreen({
-    this.dropdownValue,
-    this.onChanged,
-    this.onItem2Selected,
+    super.key,
+    required this.page,
+    required this.child,
   });
 
   @override
@@ -44,33 +37,20 @@ class EMDesktopScreen extends StatefulWidget {
 }
 
 class _EMDesktopScreenState extends State<EMDesktopScreen> {
-  // ✅ UPDATED: moved all fields into State
-  // Number of children in the PageView below; bounds the restored index.
-  static const int _pageCount = 9;
-  late final PageController _pageController;
   final EMController smController = Get.put(EMController());
   final HRController hrController = Get.put(HRController());
   final ButtonSelectionController myController = Get.put(ButtonSelectionController());
   bool showSelectOption = true;
-  int pgeControllerId = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    // Open on the page this browser tab was last on, so a refresh does not
-    // drop the user back on Dashboard. A fresh tab or a new sign-in reads 0.
-    final int initialPage =
-        TabMemory.read(TabMemory.establishment, pageCount: _pageCount);
-    _pageController = PageController(initialPage: initialPage);
-    myController.selectButton(initialPage);
-    pgeControllerId = initialPage <= 1 ? initialPage : 0;
-    // Providers notify listeners, which is not allowed mid-build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final providerEmState = Provider.of<EmMainProvider>(context, listen: false);
-      providerEmState.selectModuleScreen(initialPage);
-      providerEmState.selectModuleNameScreen(_pageNameFor(initialPage));
-    });
+  /// Go to [page] on its first tab — unless the user is already on it, in
+  /// which case it stays on whatever tab is showing. That is how the header
+  /// behaved with the PageView: re-selecting the current page changed nothing,
+  /// and every other page opened fresh.
+  ///
+  /// A real navigation, so it adds a Back step.
+  void _openPage(EmPage page) {
+    if (page == widget.page) return;
+    context.go(EmRoutes.location(page));
   }
 
   /// Dropdown label for [pageIndex]: the item's title for dropdown pages,
@@ -98,51 +78,14 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
   ];
 
   @override
-  void dispose() {
-    _pageController.dispose(); // ✅ NEW: properly dispose controller
-    super.dispose();
-  }
-
-  void navigateToPage(BuildContext context, String routeName) {
-    Provider.of<RouteProvider>(context, listen: false).setRoute(routeName);
-    switch (routeName) {
-      case RouteStrings.emCompanyIdentity:
-        _pageController.animateToPage(1,
-            duration: Duration(milliseconds: 500), curve: Curves.ease);
-        break;
-      default:
-        break;
-    }
-  }
-
-  Future<bool> _onWillPop() async {
-    final providerEmState = Provider.of<EmMainProvider>(context, listen: false);
-    if (pgeControllerId == 0) {
-      _pageController.previousPage(
-          duration: Duration(milliseconds: 500), curve: Curves.ease);
-    } else if (pgeControllerId == 1) {
-      myController.selectButton(0);
-      _pageController.animateToPage(0,
-          duration: Duration(milliseconds: 500), curve: Curves.ease);
-      providerEmState.selectModuleNameScreen(EmDashboardStringManager.selectModule);
-      return false;
-    } else if (pgeControllerId == 6) {
-      myController.selectButton(1);
-      _pageController.animateToPage(1,
-          duration: Duration(milliseconds: 500), curve: Curves.ease);
-      providerEmState.selectModuleNameScreen(EmDashboardStringManager.selectModule);
-      return false;
-    }
-    return true;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Consumer<EmMainProvider>(
-      builder: (context, providerEmState, child) {
-        return WillPopScope(
-          onWillPop: _onWillPop,
-          child: Scaffold(
+    // Browser Back and Forward belong to the router (pages visited, like any
+    // website); the index-stepping WillPopScope that used to sit here drove a
+    // PageController that no longer exists.
+    final EmPage currentPage = widget.page;
+    return Builder(
+      builder: (context) {
+        return Scaffold(
             backgroundColor: Colors.white,
             body: Stack(children: [
               Column(
@@ -170,42 +113,23 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                           mainAxisSize: MainAxisSize.min,
                           spacing: AppPadding.p30,
                           children: [
-                              Obx(
-                                    () => CustomTitleButton(
-                                  height: AppSize.s30,
-                                  width: AppSize.s100,
-                                  onPressed: () {
-                                    myController.selectButton(0);
-                                    _pageController.animateToPage(0,
-                                        duration: Duration(milliseconds: 500),
-                                        curve: Curves.ease);
-                                    providerEmState.selectModuleScreen(0);
-                                    providerEmState.selectModuleNameScreen(
-                                        EmDashboardStringManager.selectModule);
-                                    pgeControllerId = 0;
-                                  },
-                                  text: EmDashboardStringManager.dashboard,
-                                  isSelected: myController.selectedIndex.value == 0,
-                                ),
+                              CustomTitleButton(
+                                height: AppSize.s30,
+                                width: AppSize.s100,
+                                onPressed: () => _openPage(EmPage.dashboard),
+                                text: EmDashboardStringManager.dashboard,
+                                isSelected: currentPage == EmPage.dashboard,
                               ),
-                              Obx(
-                                    () => CustomTitleButton(
-                                  height: AppSize.s30,
-                                  width: AppSize.s140,
-                                  onPressed: () {
-                                    companyByIdApi(context);
-                                    myController.selectButton(1);
-                                    _pageController.animateToPage(1,
-                                        duration: Duration(milliseconds: 500),
-                                        curve: Curves.ease);
-                                    providerEmState.selectModuleScreen(1);
-                                    providerEmState.selectModuleNameScreen(
-                                        EmDashboardStringManager.selectModule);
-                                    pgeControllerId = 1;
-                                  },
-                                  text: EmDashboardStringManager.companyIdentity,
-                                  isSelected: myController.selectedIndex.value == 1,
-                                ),
+                              CustomTitleButton(
+                                height: AppSize.s30,
+                                width: AppSize.s140,
+                                onPressed: () {
+                                  companyByIdApi(context);
+                                  _openPage(EmPage.companyIdentity);
+                                },
+                                text: EmDashboardStringManager.companyIdentity,
+                                isSelected:
+                                    currentPage == EmPage.companyIdentity,
                               ),
                               Material(
                                 elevation: 4,
@@ -213,20 +137,12 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                                 child: CustomDropdownButton(
                                   height: AppSize.s30,
                                   width: AppSize.s170,
-                                  initialItem: providerEmState.pageNmaeValue,
+                                  initialItem: _pageNameFor(currentPage.index),
                                   items: _dropdownItems,
-                                  onItemSelected: (selectedValue, pageIndex) {
-                                    myController.selectButton(pageIndex);
-                                    _pageController.animateToPage(
-                                      pageIndex,
-                                      duration: Duration(milliseconds: 300),
-                                      curve: Curves.ease,
-                                    );
-                                    providerEmState.selectModuleScreen(pageIndex);
-                                    providerEmState.selectModuleNameScreen(selectedValue);
-                                    print('Page index $pageIndex');
-                                    print('Page Value $selectedValue');
-                                  },
+                                  // pageIndex is the old PageView index, which
+                                  // is EmPage's order.
+                                  onItemSelected: (selectedValue, pageIndex) =>
+                                      _openPage(EmPage.values[pageIndex]),
                                 ),
                               ),
                           ],
@@ -245,42 +161,12 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                   ),
                   Expanded(
                     flex: 8,
-                    child: PageView(
-                      controller: _pageController,
-                      physics: NeverScrollableScrollPhysics(),
-                      // Single choke point for every way the page changes
-                      // (buttons, dropdown, back handling), so refresh restores it.
-                      onPageChanged: (index) =>
-                          TabMemory.write(TabMemory.establishment, index),
-                      children: [
-                        DashboardMainButtonScreen(),
-                        CompanyIdentity(),
-                        ChangeNotifierProvider(
-                          create: (_) => SeeAllProvider(),
-                          child: SeeAllScreen(),
-                        ),
-                        CiVisitScreen(),
-                        ChangeNotifierProvider(
-                            create: (_) => HrScreenProvider(),
-                            child: HrScreen()),
-                        ChangeNotifierProvider(
-                            create: (_) => WorkScheduleProvider(),
-                            child: WorkSchedule()),
-                        ChangeNotifierProvider(
-                            create: (_) => ManageEmployDocumentProvider(),
-                            child: ManageEmployDocument()),
-                        ChangeNotifierProvider(
-                            create: (_) => FinanceProvider(),
-                            child: FinanceScreen()),
-                        CiOrgDocument(),
-                      ],
-                    ),
+                    child: widget.child,
                   ),
                   BottomBarRow()
                 ],
               ),
             ]),
-          ),
         );
       },
     );

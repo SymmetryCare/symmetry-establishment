@@ -10,14 +10,15 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/company_identity_screen.dart';
 
 ///provider
 class CiOrgDocumentProvider with ChangeNotifier {
-  final PageController tabPageController = PageController();
-  int selectedIndex = 0;
+  final PageController tabPageController;
+  int selectedIndex;
 
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
@@ -28,8 +29,40 @@ class CiOrgDocumentProvider with ChangeNotifier {
   // int selectedSubDocId = AppConfig.subDocId1Licenses; // Default value
   String selectedSubDocType = "";
 
-  CiOrgDocumentProvider() {
-    updateSelectedSubDocId(selectedSubDocId);
+  /// [initialTab] and [initialSubTab] are where the URL opened the page. The
+  /// sub-document id follows them, so "Add Doc Type" files under the sub-tab
+  /// on screen even when the page opened straight onto it.
+  CiOrgDocumentProvider({int initialTab = 0, int initialSubTab = 0})
+      : selectedIndex = initialTab,
+        tabPageController = PageController(initialPage: initialTab) {
+    updateSelectedSubDocId(subDocIdFor(initialTab, initialSubTab));
+  }
+
+  /// The sub-document id of [subTab] under [tab] — the same ids the
+  /// Corporate & Compliance and Vendor Contracts tab strips report when tapped.
+  static int subDocIdFor(int tab, int subTab) {
+    final cfg = FrontendConfigStore.data!.config;
+    final int sub = subTab.clamp(0, 4);
+    switch (tab) {
+      case 1:
+        return <int>[
+          cfg.subDocId6Leases,
+          cfg.subDocId7SNF,
+          cfg.subDocId8DME,
+          cfg.subDocId9MD,
+          cfg.subDocId10MISC,
+        ][sub];
+      case 2:
+        return cfg.subDocId0;
+      default:
+        return <int>[
+          cfg.subDocId1Licenses,
+          cfg.subDocId2Adr,
+          cfg.subDocId3CICCMedicalCR,
+          cfg.subDocId4CapReport,
+          cfg.subDocId5BalReport,
+        ][sub];
+    }
   }
 
   void selectButton(int index) {
@@ -134,13 +167,50 @@ class CiOrgDocumentProvider with ChangeNotifier {
 }
 
 class CiOrgDocument extends StatelessWidget {
+  const CiOrgDocument({
+    super.key,
+    this.initialTab = 0,
+    this.initialSubTab = 0,
+    this.onTabChanged,
+    this.onSubTabChanged,
+  });
+
+  /// The tab the URL names: Corporate & Compliance, Vendor Contracts or
+  /// Policies & Procedures.
+  final int initialTab;
+
+  /// The sub-tab the URL names under [initialTab] (Licenses, SNF, ...).
+  final int initialSubTab;
+
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
+
+  /// A sub-tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onSubTabChanged;
+
+  /// The sub-tab [tab]'s strip opens on: the URL's when it is that tab, the
+  /// first otherwise — a tab switched to always starts on its first sub-tab.
+  int _subTabFor(int tab) => tab == initialTab ? initialSubTab : 0;
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => CiOrgDocumentProvider(),
+      create: (_) => CiOrgDocumentProvider(
+        initialTab: initialTab,
+        initialSubTab: initialSubTab,
+      ),
       child: Consumer<CiOrgDocumentProvider>(
         builder: (context, provider, _) {
-          return Column(
+          return RouteTabSync(
+            tab: initialTab,
+            onTabChanged: (int tab) {
+              if (provider.selectedIndex == tab) return;
+              provider.selectButton(tab);
+              provider.updateSelectedSubDocId(
+                CiOrgDocumentProvider.subDocIdFor(tab, initialSubTab),
+              );
+            },
+            child: Column(
             children: [
               SizedBox(height: AppSize.s20),
               Padding(
@@ -239,12 +309,16 @@ class CiOrgDocument extends StatelessWidget {
                           // docID: AppConfig.corporateAndCompliance,
                           selectedSubDocType: provider.selectedSubDocType,
                           onSubDocIdSelected: provider.updateSelectedSubDocId,
+                          initialSubTab: _subTabFor(0),
+                          onSubTabChanged: onSubTabChanged,
                         ),
                         CIVendorContract(
                           docId:  FrontendConfigStore.data!.config.vendorContracts,
                           // docId: AppConfig.vendorContracts,
                           onSubDocIdSelected: provider.updateSelectedSubDocId,
                           selectedSubDocType: provider.selectedSubDocType,
+                          initialSubTab: _subTabFor(1),
+                          onSubTabChanged: onSubTabChanged,
                         ),
                         ChangeNotifierProvider(
                           create: (context) => CIPoliciesProcedureProvider(),
@@ -315,6 +389,7 @@ class CiOrgDocument extends StatelessWidget {
           //       ),
           //     ),
             ],
+          ),
           );
         },
       ),
@@ -328,7 +403,11 @@ class CiOrgDocument extends StatelessWidget {
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         hoverColor: Colors.transparent,
-        onTap: () => provider.selectButton(index),
+        onTap: () {
+          if (provider.selectedIndex == index) return;
+          provider.selectButton(index);
+          onTabChanged?.call(index);
+        },
         child: Container(
           height: AppSize.s30,
           decoration: BoxDecoration(

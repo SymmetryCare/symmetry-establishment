@@ -10,6 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # usePathUrlStrategy() — clean URLs (/establishment/users) instead of
+  # /establishment/#/establishmentDesktop.
+  flutter_web_plugins:
+    sdk: flutter
 
   app_links: ^6.1.4
   auto_size_text: ^3.0.0
@@ -34,6 +38,7 @@ dependencies:
   geocoding: ^3.0.0
   geolocator: ^11.0.0
   get: ^4.6.6
+  go_router: ^14.6.2
   google_fonts: ^6.2.1
   google_maps_flutter: ^2.9.0
   http: ^1.2.2

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
@@ -20,14 +22,25 @@ class _MapScreenState extends State<MapScreen> {
   late GoogleMapController _mapController;
   late LatLng _selectedLocation;
 
+  /// Browser Back closes the picker. Cancelled in [dispose]: left running, it
+  /// outlived the picker and, on every later Back, tried to pop with this
+  /// closed screen's context.
+  StreamSubscription<html.PopStateEvent>? _popStateSubscription;
+
   @override
   void initState() {
     super.initState();
     _selectedLocation = widget.initialLocation;
-    html.window.onPopState.listen((event) {
-      if (Navigator.canPop(context)) {
+    _popStateSubscription = html.window.onPopState.listen((event) {
+      if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }});
+  }
+
+  @override
+  void dispose() {
+    _popStateSubscription?.cancel();
+    super.dispose();
   }
 
   void _onMapCreated(GoogleMapController controller) {

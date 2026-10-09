@@ -7,13 +7,19 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/ci_org_doc_tab/widgets/ci_vendor_contract_tab/ci_vc_misc.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/ci_org_doc_tab/widgets/ci_vendor_contract_tab/ci_vd_md.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 
 class VendorContractState with ChangeNotifier {
-  int _selectedIndex = 0;
+  /// [initialIndex] is the sub-tab the URL opened the page on.
+  VendorContractState({int initialIndex = 0}) : _selectedIndex = initialIndex {
+    _selectedSubDocType = getSubDocTypeForIndex(initialIndex);
+  }
+
+  int _selectedIndex;
   String _selectedSubDocType = "";
 
   String get selectedSubDocType => _selectedSubDocType;
@@ -71,21 +77,49 @@ class CIVendorContract extends StatelessWidget {
   final Function(int) onSubDocIdSelected;
   final String selectedSubDocType;
 
+  /// The sub-tab the URL names (Leases & Services ... MISC).
+  final int initialSubTab;
+
+  /// A sub-tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onSubTabChanged;
+
   CIVendorContract({
     Key? key,
     required this.docId,
     required this.onSubDocIdSelected,
     required this.selectedSubDocType,
+    this.initialSubTab = 0,
+    this.onSubTabChanged,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final pageController = PageController();
+    final pageController = PageController(initialPage: initialSubTab);
 
     return ChangeNotifierProvider(
-      create: (_) => VendorContractState(),
+      create: (_) => VendorContractState(initialIndex: initialSubTab),
       child: Consumer<VendorContractState>(
         builder: (context, vendorContractState, child) {
+          return RouteTabSync(
+            tab: initialSubTab,
+            onTabChanged: (int subTab) {
+              if (vendorContractState.selectedIndex == subTab) return;
+              // The post-frame sync below moves the PageView to it.
+              vendorContractState.setSelectedIndex(subTab);
+              onSubDocIdSelected(
+                  vendorContractState.getSubDocIdForIndex(subTab));
+            },
+            child: _buildTabs(context, vendorContractState, pageController),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTabs(BuildContext context,
+      VendorContractState vendorContractState, PageController pageController) {
+    return Builder(
+        builder: (context) {
           // Sync PageController with selectedIndex
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (pageController.hasClients &&
@@ -142,6 +176,7 @@ class CIVendorContract extends StatelessWidget {
                                 duration: const Duration(milliseconds: 300),
                                 curve: Curves.easeInOut,
                               );
+                              onSubTabChanged?.call(index);
                             },
                           ),
                       ],
@@ -202,7 +237,6 @@ class CIVendorContract extends StatelessWidget {
             ],
           );
         },
-      ),
     );
   }
 }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
+import 'package:symmetry_establishment/app/router/em_routes.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/company_logo_service.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 
@@ -95,11 +97,20 @@ class _CompanyLogoWidgetState extends State<CompanyLogoWidget> {
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
       hoverColor: Colors.transparent,
+      // Home is the Dashboard. On the signed-in pages that is a URL on the
+      // router, which has no named '/home' route to push.
       onTap: widget.navigateOnTap
-          ? () => Navigator.of(context).pushNamedAndRemoveUntil(
-        '/home',
-        ModalRoute.withName('/home'),
-      )
+          ? () {
+              final GoRouter? router = GoRouter.maybeOf(context);
+              if (router != null) {
+                router.go(EmRoutes.home);
+                return;
+              }
+              Navigator.of(context).pushNamedAndRemoveUntil(
+                '/home',
+                ModalRoute.withName('/home'),
+              );
+            }
           : null,
       child: SizedBox(
         width: widget.width,

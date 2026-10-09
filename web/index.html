@@ -15,6 +15,21 @@
     the `--base-href` argument provided to `flutter build`.
   -->
   <base href="$FLUTTER_BASE_HREF">
+  <script>
+    // Establishment used to address screens after a '#'
+    // (/establishment/#/establishmentDesktop). It now uses real paths
+    // (/establishment/users) — see usePathUrlStrategy() in lib/main.dart — so
+    // turn an old link or bookmark into its path form before Flutter reads the
+    // URL. The router then sends any old route name to the right page.
+    (function () {
+      var hash = location.hash;
+      if (hash.indexOf('#/') !== 0) return;
+      var base = new URL(document.baseURI).pathname; // e.g. "/establishment/"
+      var route = hash.slice(2); // e.g. "establishmentDesktop"
+      if (route.indexOf('?') === -1) route += location.search;
+      history.replaceState(null, '', base + route);
+    })();
+  </script>
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">

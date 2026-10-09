@@ -5,6 +5,7 @@ import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
+import 'package:symmetry_establishment/app/services/session/app_session.dart';
 
 class Api {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -240,7 +241,13 @@ class Api {
       // stranded the user on a second login form on the same origin, with the
       // module picker never entered. Manual sign-out already branched this
       // way; expiry did not.
-      if (!ShellLink.signOutToShell()) {
+      if (ShellLink.signOutToShell()) {
+        // The browser is leaving for the shell.
+      } else if (AppSession.instance.end()) {
+        // The signed-in pages gave way to the login flow. Clear the guard so
+        // the next session's expiry is handled too.
+        _isNavigatingToLogin = false;
+      } else {
         Navigator.pushNamedAndRemoveUntil(
           _buildContext,
           LoginScreen.routeName,

@@ -26,6 +26,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/hr_salesAdmin_tab.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
 import 'package:symmetry_establishment/app/services/config/department_ids.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 
 /// stl conversion
 class HrScreenProvider with ChangeNotifier {
@@ -46,6 +47,14 @@ class HrScreenProvider with ChangeNotifier {
 class HrScreen extends StatelessWidget {
   static const String routeName = RouteStrings.emHrAdminScreen;
 
+  const HrScreen({super.key, this.initialTab = 0, this.onTabChanged});
+
+  /// The tab the URL names: Clinical, Sales or Administration.
+  final int initialTab;
+
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
@@ -53,11 +62,21 @@ class HrScreen extends StatelessWidget {
       child: Consumer<HrScreenProvider>(
         builder: (context, hrProvider, child) {
           return ChangeNotifierProvider(
-            create: (_) => HrWidgetProvider(),
-            child: HrWidget(
-              hrPageController: hrProvider.hrPageController,
-              selectedIndex: hrProvider.selectedIndex,
-              selectButton: hrProvider.selectButton,
+            create: (_) => HrWidgetProvider(initialIndex: initialTab),
+            child: Builder(
+              builder: (context) => RouteTabSync(
+                tab: initialTab,
+                onTabChanged: (int tab) {
+                  final provider = context.read<HrWidgetProvider>();
+                  if (provider.selectedIndex != tab) provider.selectButton(tab);
+                },
+                child: HrWidget(
+                  hrPageController: hrProvider.hrPageController,
+                  selectedIndex: hrProvider.selectedIndex,
+                  selectButton: hrProvider.selectButton,
+                  onTabChanged: onTabChanged,
+                ),
+              ),
             ),
           );
         },
@@ -68,18 +87,21 @@ class HrScreen extends StatelessWidget {
 
 ///
 class HrWidgetProvider with ChangeNotifier {
-  final PageController _hrPageController = PageController();
+  final PageController _hrPageController;
   TextEditingController typeController = TextEditingController();
   TextEditingController shorthandController = TextEditingController();
   final StreamController<List<HRAllData>> _controller = StreamController<List<HRAllData>>();
-  int _selectedIndex = 0;
+  int _selectedIndex;
   int get selectedIndex => _selectedIndex;
   var _deptId = 0;
   get deptId => _deptId;
   String color = "";
   List<Color> containerColors = List.generate(20, (index) => Color(0xffE8A87D));
 
-  HrWidgetProvider() {
+  /// [initialIndex] is the tab the URL opened the page on.
+  HrWidgetProvider({int initialIndex = 0})
+      : _selectedIndex = initialIndex,
+        _hrPageController = PageController(initialPage: initialIndex) {
     _loadColors();
   }
 
@@ -126,7 +148,10 @@ class HrWidget extends StatelessWidget {
   final PageController hrPageController;
   final int selectedIndex;
   final Function(int) selectButton;
-  const HrWidget({super.key, required this.hrPageController, required this.selectedIndex, required this.selectButton});
+
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
+  const HrWidget({super.key, required this.hrPageController, required this.selectedIndex, required this.selectButton, this.onTabChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -189,6 +214,7 @@ class HrWidget extends StatelessWidget {
                                     ),
                                     onTap: () {
                                       provider.selectButton(0);
+                                      onTabChanged?.call(0);
                                       // metaDocID = snapshot.data![index].employeeDocMetaDataId;
                                     }),
                                 InkWell(
@@ -210,6 +236,7 @@ class HrWidget extends StatelessWidget {
                                     ),
                                     onTap: () {
                                       provider.selectButton(1);
+                                      onTabChanged?.call(1);
                                       // metaDocID = snapshot.data![index].employeeDocMetaDataId;
                                     }),
                                 InkWell(
@@ -236,6 +263,7 @@ class HrWidget extends StatelessWidget {
                                     ),
                                     onTap: () {
                                       provider.selectButton(2);
+                                      onTabChanged?.call(2);
                                       // metaDocID = snapshot.data![index].employeeDocMetaDataId;
                                     }),
                               ]),

@@ -1,19 +1,19 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:symmetry_establishment/app/services/title/app_title.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import 'package:symmetry_establishment/app/login_flow_app.dart';
 import 'package:symmetry_establishment/app/resources/provider/version_provider.dart';
+import 'package:symmetry_establishment/app/router/em_router.dart';
 import 'package:symmetry_establishment/app/services/config/error_surface.dart';
 import 'package:symmetry_establishment/app/services/config/frontend_config_boot.dart';
-import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
-import 'package:symmetry_establishment/app/resources/screen_route_name.dart';
+import 'package:symmetry_establishment/app/services/session/app_session.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
-import 'package:symmetry_establishment/data/navigator_arguments/screen_arguments.dart';
 import 'package:symmetry_establishment/firebase_options.dart';
-import 'package:symmetry_establishment/modules/establishment/presentation/screens/responsive_screen_em.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/see_all_screen/widgets/user_edit_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/see_all_screen/widgets/user_pagination.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/add_holiday_popup_const.dart';
@@ -27,18 +27,29 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/providers/hr_onboarding_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/hr_register_provider.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/hr_search_provider.dart';
-import 'package:symmetry_establishment/presentation/screens/login_module/email_verification/email_verification.dart';
-import 'package:symmetry_establishment/presentation/screens/login_module/forget_pass_verification/forget_pass_verification.dart';
-import 'package:symmetry_establishment/presentation/screens/login_module/forget_password/forget_password_screen.dart';
-import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/app/services/config/department_ids.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/all_from_hr_manager.dart';
 
-/// Global navigator key. The app bar reaches for it, and the post-first-frame
+/// The signed-in app's root navigator (the router's). The post-first-frame
 /// frontend-config refresh needs a `BuildContext` that outlives any one screen.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// The login flow's navigator. Its own key: the signed-in app's router owns
+/// [navigatorKey], and one GlobalKey cannot sit on two navigators.
+final GlobalKey<NavigatorState> loginNavigatorKey = GlobalKey<NavigatorState>();
+
 Future<void> main() async {
+  // Real paths in the address bar — /establishment/users, not
+  // /establishment/#/establishmentDesktop — so every page and tab has a URL
+  // that behaves like any website's: refresh and Enter in the address bar
+  // reload that screen, and a copied link opens it. Must run before the
+  // first frame.
+  //
+  // The server has to answer every path under /establishment/ with
+  // /establishment/index.html (see README.md, "Deploy"), or a refresh on any
+  // page but the first is a 404. Old #/ links are rewritten in
+  // web/index.html.
+  usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
   // No-op unless built with --dart-define=DEBUG_ERRORS=true.
   ErrorSurface.install();
@@ -51,9 +62,8 @@ Future<void> main() async {
   await FrontendConfigBoot.ensureLoaded();
 
   final accessToken = await TokenManager.getAccessToken();
-  final bool signedIn = accessToken.isNotEmpty;
-  EstablishmentApplication.markSession(signedIn);
-  runApp(EstablishmentApplication(isSignedIn: signedIn));
+  if (accessToken.isNotEmpty) AppSession.instance.start();
+  runApp(const EstablishmentApplication());
 }
 
 /// Establishment runs in the same two shapes HR does — standalone at the site
@@ -62,20 +72,52 @@ Future<void> main() async {
 /// login is already in `localStorage` and this boots straight to the module.
 /// Which one is decided at build time by `--dart-define=SHELL_PATH=/`; see
 /// `app/services/shell/shell_link.dart`.
+///
+/// Signed out, it shows the login flow ([LoginFlowApp]); signed in, the
+/// Establishment pages on go_router ([EmRouter]), one URL per page and tab.
+/// [AppSession] decides which, and switches on login, sign-out and expiry.
+/// Every provider sits above both, so neither swap loses app-wide state.
 class EstablishmentApplication extends StatelessWidget {
-  const EstablishmentApplication({super.key, required this.isSignedIn});
+  const EstablishmentApplication({super.key});
 
-  final bool isSignedIn;
+  static final ThemeData _theme = ThemeData(
+    colorScheme: ColorScheme.fromSwatch().copyWith(
+      primary: const Color(0xff50B5E5),
+    ),
+    fontFamily: GoogleFonts.firaSans().fontFamily,
+    useMaterial3: false,
+    visualDensity: VisualDensity.adaptivePlatformDensity,
+  );
 
-  /// Whether a session exists *now*, as opposed to at boot.
-  ///
-  /// [isSignedIn] is a snapshot taken in `main()`, before the first frame. It
-  /// is the right thing for `initialRoute`, but it is wrong for the fallback
-  /// in [_generateRoute]: after a successful login it still says `false`, so
-  /// any route this table does not name would send a signed-in user back to
-  /// the login screen. `onGenerateRoute` is synchronous and cannot re-read the
-  /// async token store, so the login hand-off flips this instead.
-  static bool _hasSession = false;
+  /// Start-up work that needs a context under the providers: the live
+  /// frontend config, and this tenant's own department ids. Each runs its API
+  /// call with [key]'s navigator context once the first frame is up.
+  static TransitionBuilder _startUpWork(GlobalKey<NavigatorState> key) {
+    return (BuildContext context, Widget? child) {
+      // Replace the cached/default config with the live one once there is
+      // a context to make the call with.
+      FrontendConfigBoot.refreshInBackground(key);
+      // And this tenant's own department ids, which the global
+      // config above does NOT supply — its clinicalId/salesId/
+      // administrationId are the same for every tenant, while
+      // Department.DepartmentId is per-tenant and need not match.
+      // Warmed here so the screens that need it have it; every
+      // lookup falls back to the configured id regardless.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = key.currentState?.context;
+        if (ctx != null) {
+          // companyHRHeadApi takes a deptId it only prints — the
+          // endpoint behind it (getHrType) lists every department
+          // and takes no id — so the 0 here is ignored.
+          DepartmentIds.ensureLoaded(
+            ctx,
+            (c) => companyHRHeadApi(c, 0),
+          );
+        }
+      });
+      return child ?? const SizedBox.shrink();
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,111 +156,26 @@ class EstablishmentApplication extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => DefineHolidaysProvider()),
         ChangeNotifierProvider(create: (_) => DeleteUserProvider()),
       ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        title: AppTitle.value,
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSwatch().copyWith(
-            primary: const Color(0xff50B5E5),
-          ),
-          fontFamily: GoogleFonts.firaSans().fontFamily,
-          useMaterial3: false,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-        ),
-        initialRoute:
-            isSignedIn ? RouteStrings.emDesktop : LoginScreen.routeName,
-        onGenerateRoute: _generateRoute,
-        builder: (BuildContext context, Widget? child) {
-          // Replace the cached/default config with the live one once there is
-          // a context to make the call with.
-          FrontendConfigBoot.refreshInBackground(navigatorKey);
-          // And this tenant's own department ids, which the global
-          // config above does NOT supply — its clinicalId/salesId/
-          // administrationId are the same for every tenant, while
-          // Department.DepartmentId is per-tenant and need not match.
-          // Warmed here so the screens that need it have it; every
-          // lookup falls back to the configured id regardless.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final ctx = navigatorKey.currentState?.context;
-            if (ctx != null) {
-              // companyHRHeadApi takes a deptId it only prints — the
-              // endpoint behind it (getHrType) lists every department
-              // and takes no id — so the 0 here is ignored.
-              DepartmentIds.ensureLoaded(
-                ctx,
-                (c) => companyHRHeadApi(c, 0),
-              );
-            }
-          });
-          return child ?? const SizedBox.shrink();
+      child: ListenableBuilder(
+        listenable: AppSession.instance,
+        builder: (BuildContext context, Widget? _) {
+          if (!AppSession.instance.isSignedIn) {
+            return LoginFlowApp(
+              navigatorKey: loginNavigatorKey,
+              title: AppTitle.value,
+              theme: _theme,
+              builder: _startUpWork(loginNavigatorKey),
+            );
+          }
+          return MaterialApp.router(
+            title: AppTitle.value,
+            debugShowCheckedModeBanner: false,
+            theme: _theme,
+            routerConfig: EmRouter.router(navigatorKey),
+            builder: _startUpWork(navigatorKey),
+          );
         },
       ),
     );
-  }
-
-  /// Record whether a session exists. Called from `main()` with the boot
-  /// snapshot, and again when the login flow hands off to the module.
-  static void markSession(bool value) => _hasSession = value;
-
-  Route<dynamic> _generateRoute(RouteSettings settings) {
-    final Widget page;
-
-    switch (settings.name) {
-      // Reaching the module means the login flow completed (or the app booted
-      // with a session), so the token is written by now.
-      case RouteStrings.emDesktop:
-      case RouteStrings.home:
-        _hasSession = true;
-        page = ResponsiveScreenEM();
-        break;
-      case LoginScreen.routeName:
-        // Logout and session-expiry both land here; the session is gone.
-        _hasSession = false;
-        page = _loginOrShell();
-        break;
-      case EmailVerification.routeName:
-        final email = _emailFrom(settings.arguments);
-        page = email == null
-            ? _loginOrShell()
-            : EmailVerification(email: email);
-        break;
-      case ForgetPassword.routeName:
-        page = const ForgetPassword();
-        break;
-      case VerifyPassword.routeName:
-        final email = _emailFrom(settings.arguments);
-        page =
-            email == null ? _loginOrShell() : VerifyPassword(email: email);
-        break;
-      default:
-        page = _hasSession ? ResponsiveScreenEM() : _loginOrShell();
-        break;
-    }
-
-    return MaterialPageRoute<void>(builder: (_) => page, settings: settings);
-  }
-
-  /// This app's own login screen, or a redirect to the shell's when hosted.
-  ///
-  /// Every route above that would otherwise render a login form goes through
-  /// here, so a shell-hosted build never shows a second login form on the same
-  /// origin. The redirect is synchronous, so the empty widget is on screen
-  /// only until the browser navigates.
-  ///
-  /// Routes that are meant to work signed-out on their own -- the onboarding
-  /// deep link a candidate opens from an emailed link, which carries no
-  /// session at all -- have their own cases and never reach this.
-  Widget _loginOrShell() {
-    if (ShellLink.signOutToShell()) return const SizedBox.shrink();
-    return const LoginScreen();
-  }
-
-  String? _emailFrom(Object? arguments) {
-    if (arguments is ScreenArguments) {
-      final email = arguments.title?.trim();
-      return email == null || email.isEmpty ? null : email;
-    }
-    return null;
   }
 }

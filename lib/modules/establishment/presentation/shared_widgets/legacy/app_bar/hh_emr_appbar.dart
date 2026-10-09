@@ -2,10 +2,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:go_router/go_router.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/app/resources/font_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/user_appbar_manager.dart';
 import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
+import 'package:symmetry_establishment/app/services/session/app_session.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/user/user_appbar.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
@@ -31,6 +33,12 @@ void _afterSignOut(BuildContext context) {
     ShellLink.signOutRedirect();
     return;
   }
+  // The signed-in pages are on go_router, which has no named routes to push;
+  // ending the session swaps them for the login flow (see main.dart).
+  if (AppSession.instance.end()) return;
+  // Already ended — AuthManager.logOutuserByToken does it on success, before
+  // this runs — so the login flow is on its way and this screen is going.
+  if (!context.mounted || GoRouter.maybeOf(context) != null) return;
   Navigator.pushNamedAndRemoveUntil(
     context,
     LoginScreen.routeName,

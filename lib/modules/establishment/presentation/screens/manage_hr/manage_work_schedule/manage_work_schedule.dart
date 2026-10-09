@@ -2,14 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/define_holidays.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/define_work_weeks.dart';
 
 class WorkScheduleProvider extends ChangeNotifier {
-  int _selectedIndex = 0;
-  PageController _pageController = PageController();
+  /// [initialIndex] is the tab the URL opened the page on.
+  WorkScheduleProvider({int initialIndex = 0})
+      : _selectedIndex = initialIndex,
+        _pageController = PageController(initialPage: initialIndex);
+
+  int _selectedIndex;
+  final PageController _pageController;
 
   int get selectedIndex => _selectedIndex;
   PageController get pageController => _pageController;
@@ -32,11 +38,31 @@ class WorkScheduleProvider extends ChangeNotifier {
 }
 
 class WorkSchedule extends StatelessWidget {
+  const WorkSchedule({super.key, this.initialTab = 0, this.onTabChanged});
+
+  /// The tab the URL names: Shifts & Batches or Define Holidays.
+  final int initialTab;
+
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
+
+  void _onTabTapped(WorkScheduleProvider provider, int index) {
+    provider.selectButton(index);
+    onTabChanged?.call(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final workScheduleProvider = Provider.of<WorkScheduleProvider>(context);
 
-    return Consumer<WorkScheduleProvider>(
+    return RouteTabSync(
+      tab: initialTab,
+      onTabChanged: (int tab) {
+        if (workScheduleProvider.selectedIndex != tab) {
+          workScheduleProvider.selectButton(tab);
+        }
+      },
+      child: Consumer<WorkScheduleProvider>(
         builder: (context, providerState, child) {
           return Material(
             color: Colors.white,
@@ -67,7 +93,7 @@ class WorkSchedule extends StatelessWidget {
                                 splashColor: Colors.transparent,
                                 highlightColor: Colors.transparent,
                                 hoverColor: Colors.transparent,
-                                onTap: () => providerState.selectButton(0),
+                                onTap: () => _onTabTapped(providerState, 0),
                                 child: Container(
                                   height: AppSize.s30,
                                   width: AppSize.s160,
@@ -92,7 +118,7 @@ class WorkSchedule extends StatelessWidget {
                                 splashColor: Colors.transparent,
                                 highlightColor: Colors.transparent,
                                 hoverColor: Colors.transparent,
-                                onTap: () => providerState.selectButton(1),
+                                onTap: () => _onTabTapped(providerState, 1),
                                 child: Container(
                                   height: AppSize.s30,
                                   width: AppSize.s155,
@@ -188,6 +214,7 @@ class WorkSchedule extends StatelessWidget {
             ),
           );
         }
+      ),
     );
   }
 }

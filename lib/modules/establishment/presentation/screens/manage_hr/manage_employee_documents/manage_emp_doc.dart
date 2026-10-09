@@ -9,12 +9,17 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/add_degree_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_employee_documents/widgets/degree_list.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/router/route_tab_sync.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 
 class ManageEmployDocumentProvider with ChangeNotifier {
-  final PageController _managePageController = PageController();
+  /// [initialIndex] is the tab the URL opened the page on.
+  ManageEmployDocumentProvider({int initialIndex = 0})
+      : _managePageController = PageController(initialPage: initialIndex);
+
+  final PageController _managePageController;
   int _selectedIndex = 1;
 
   PageController get managePageController => _managePageController;
@@ -39,18 +44,36 @@ class ManageEmployDocumentProvider with ChangeNotifier {
 }
 
 class ManageEmployDocument extends StatelessWidget {
-  const ManageEmployDocument({super.key});
+  const ManageEmployDocument({super.key, this.initialTab = 0, this.onTabChanged});
+
+  /// The tab the URL names (Health ... Degree).
+  final int initialTab;
+
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<ManageEmployDocumentProvider>(context);
 
     return ChangeNotifierProvider(
-      create: (_) => ManageEmpDocProvider(),
-      child: ManageEmpDocWidget(
-        managePageController: provider.managePageController,
-       // selectedIndex: provider.selectedIndex,
-        selectButton: provider.selectButton,
+      create: (_) => ManageEmpDocProvider(initialIndex: initialTab),
+      child: Builder(
+        builder: (context) => RouteTabSync(
+          tab: initialTab,
+          onTabChanged: (int tab) {
+            final tabs = context.read<ManageEmpDocProvider>();
+            if (tabs.selectedIndex == tab) return;
+            tabs.selectButton(tab);
+            provider.managePageController.jumpToPage(tab);
+          },
+          child: ManageEmpDocWidget(
+            managePageController: provider.managePageController,
+           // selectedIndex: provider.selectedIndex,
+            selectButton: provider.selectButton,
+            onTabChanged: onTabChanged,
+          ),
+        ),
       ),
     );
   }
@@ -58,7 +81,10 @@ class ManageEmployDocument extends StatelessWidget {
 
 ///tabbar
 class ManageEmpDocProvider with ChangeNotifier {
-  int _selectedIndex = 0;
+  /// [initialIndex] is the tab the URL opened the page on.
+  ManageEmpDocProvider({int initialIndex = 0}) : _selectedIndex = initialIndex;
+
+  int _selectedIndex;
   int get selectedIndex => _selectedIndex;
 
   String? _expiryType;
@@ -103,10 +129,14 @@ class ManageEmpDocWidget extends StatelessWidget {
   final PageController managePageController;
   final Function(int) selectButton;
 
+  /// A tab was tapped; puts it in the URL.
+  final ValueChanged<int>? onTabChanged;
+
   ManageEmpDocWidget({
     Key? key,
     required this.managePageController,
     required this.selectButton,
+    this.onTabChanged,
   }) : super(key: key);
 
   @override
@@ -217,6 +247,7 @@ class ManageEmpDocWidget extends StatelessWidget {
                           provider.selectButton(index);
                           // Jump directly to the selected page without animation
                           managePageController.jumpToPage(index);
+                          onTabChanged?.call(index);
                         },
                         child: Container(
                           height: AppSize.s30,
