@@ -1,6 +1,7 @@
 import 'dart:html' as html;
 
 import 'package:flutter/foundation.dart' show VoidCallback;
+import 'package:symmetry_establishment/app/services/tab_memory.dart';
 
 /// Whether this Establishment build is hosted behind symmetry-shell, and how to get back.
 ///
@@ -83,6 +84,9 @@ class ShellLink {
   /// replace, not assign: a signed-out session must not be reachable by
   /// pressing Back.
   static bool signOutToShell() {
+    // Every sign-out path (manual, expiry, the login route) passes through
+    // here, so the next sign-in starts on the first page, not the last one.
+    TabMemory.clearAll();
     final String? url = shellUrl;
     if (url == null) return false;
     html.window.location.replace(url);

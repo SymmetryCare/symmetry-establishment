@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
+import 'package:symmetry_establishment/app/services/tab_memory.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/em_dashboard_string_manager.dart';
 import 'package:symmetry_establishment/app/resources/font_manager.dart';
@@ -44,7 +45,9 @@ class EMDesktopScreen extends StatefulWidget {
 
 class _EMDesktopScreenState extends State<EMDesktopScreen> {
   // ✅ UPDATED: moved all fields into State
-  final PageController _pageController = PageController();
+  // Number of children in the PageView below; bounds the restored index.
+  static const int _pageCount = 9;
+  late final PageController _pageController;
   final EMController smController = Get.put(EMController());
   final HRController hrController = Get.put(HRController());
   final ButtonSelectionController myController = Get.put(ButtonSelectionController());
@@ -54,16 +57,45 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ NEW: Reset dropdown and page to Dashboard every time this screen opens
+    // Open on the page this browser tab was last on, so a refresh does not
+    // drop the user back on Dashboard. A fresh tab or a new sign-in reads 0.
+    final int initialPage =
+        TabMemory.read(TabMemory.establishment, pageCount: _pageCount);
+    _pageController = PageController(initialPage: initialPage);
+    myController.selectButton(initialPage);
+    pgeControllerId = initialPage <= 1 ? initialPage : 0;
+    // Providers notify listeners, which is not allowed mid-build.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final providerEmState = Provider.of<EmMainProvider>(context, listen: false);
-      providerEmState.selectModuleScreen(0);
-      providerEmState.selectModuleNameScreen(EmDashboardStringManager.selectModule);
-      myController.selectButton(0);
-      _pageController.jumpToPage(0);
-      pgeControllerId = 0;
+      providerEmState.selectModuleScreen(initialPage);
+      providerEmState.selectModuleNameScreen(_pageNameFor(initialPage));
     });
   }
+
+  /// Dropdown label for [pageIndex]: the item's title for dropdown pages,
+  /// the placeholder for Dashboard and Company Identity.
+  String _pageNameFor(int pageIndex) {
+    for (final item in _dropdownItems) {
+      if (item.index == pageIndex) return item.title;
+    }
+    return EmDashboardStringManager.selectModule;
+  }
+
+  final List<DropdownItem> _dropdownItems = [
+    DropdownItem(title: "User Management", isHeading: true),
+    DropdownItem(title: "Users", index: 2),
+    DropdownItem(title: "Clinical", isHeading: true),
+    DropdownItem(title: "Visits", index: 3),
+    DropdownItem(title: "HR", isHeading: true),
+    DropdownItem(title: "Designation Settings", index: 4),
+    DropdownItem(title: "Work Schedule", index: 5),
+    DropdownItem(title: "Employee Documents", index: 6),
+    DropdownItem(title: "Finance", isHeading: true),
+    DropdownItem(title: "Pay Rate", index: 7),
+    DropdownItem(title: "Org Document", isHeading: true),
+    DropdownItem(title: "Document Definition", index: 8),
+  ];
 
   @override
   void dispose() {
@@ -182,20 +214,7 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                                   height: AppSize.s30,
                                   width: AppSize.s170,
                                   initialItem: providerEmState.pageNmaeValue,
-                                  items: [
-                                    DropdownItem(title: "User Management", isHeading: true),
-                                    DropdownItem(title: "Users", index: 2),
-                                    DropdownItem(title: "Clinical", isHeading: true),
-                                    DropdownItem(title: "Visits", index: 3),
-                                    DropdownItem(title: "HR", isHeading: true),
-                                    DropdownItem(title: "Designation Settings", index: 4),
-                                    DropdownItem(title: "Work Schedule", index: 5),
-                                    DropdownItem(title: "Employee Documents", index: 6),
-                                    DropdownItem(title: "Finance", isHeading: true),
-                                    DropdownItem(title: "Pay Rate", index: 7),
-                                    DropdownItem(title: "Org Document", isHeading: true),
-                                    DropdownItem(title: "Document Definition", index: 8),
-                                  ],
+                                  items: _dropdownItems,
                                   onItemSelected: (selectedValue, pageIndex) {
                                     myController.selectButton(pageIndex);
                                     _pageController.animateToPage(
@@ -229,6 +248,10 @@ class _EMDesktopScreenState extends State<EMDesktopScreen> {
                     child: PageView(
                       controller: _pageController,
                       physics: NeverScrollableScrollPhysics(),
+                      // Single choke point for every way the page changes
+                      // (buttons, dropdown, back handling), so refresh restores it.
+                      onPageChanged: (index) =>
+                          TabMemory.write(TabMemory.establishment, index),
                       children: [
                         DashboardMainButtonScreen(),
                         CompanyIdentity(),
