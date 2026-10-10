@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:symmetry_establishment/app/router/em_routes.dart';
+import 'package:symmetry_establishment/app/services/session/app_session.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/ci_org_document.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/ci_visit.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/company_identity.dart';
@@ -30,13 +31,26 @@ class EmRouter {
 
   static GoRouter? _router;
 
-  /// Created once and kept, so signing out and back in returns to the screen
-  /// the session was on. [navigatorKey]'s context is what main.dart's start-up
-  /// work (frontend config, department ids) runs its API calls with.
+  /// Whether a router was made earlier in this page load.
+  static bool _madeOne = false;
+
+  /// One router per signed-in session, dropped when the session ends.
+  /// [navigatorKey]'s context is what main.dart's start-up work (frontend
+  /// config, department ids) runs its API calls with.
+  ///
+  /// The first opens on the URL the page was loaded with — a deep link, a
+  /// refresh. One made after signing in again opens on the Dashboard, where a
+  /// login always led; a router kept from the last session would show its
+  /// last page while the address bar still said where the login flow left it.
   static GoRouter router(GlobalKey<NavigatorState> navigatorKey) {
-    return _router ??= GoRouter(
+    if (_router != null) return _router!;
+    final bool afterSignIn = _madeOne;
+    _madeOne = true;
+    AppSession.instance.addListener(_dropOnSignOut);
+    return _router = GoRouter(
       navigatorKey: navigatorKey,
       initialLocation: EmRoutes.home,
+      overridePlatformDefaultLocation: afterSignIn,
       redirect: (BuildContext context, GoRouterState state) =>
           EmRoutes.canonical(state.uri),
       onException: (BuildContext context, GoRouterState state,
@@ -160,6 +174,12 @@ class EmRouter {
         ),
       ],
     );
+  }
+
+  static void _dropOnSignOut() {
+    if (AppSession.instance.isSignedIn) return;
+    AppSession.instance.removeListener(_dropOnSignOut);
+    _router = null;
   }
 
   static Page<void> _orgDocumentsPage(
