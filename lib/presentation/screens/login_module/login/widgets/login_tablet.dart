@@ -21,7 +21,10 @@ class LoginTablet extends StatefulWidget {
 }
 
 class _LoginTabletState extends State<LoginTablet> {
-  final ScreenSizeController myController = Get.find();
+  // Get.put, not Get.find: nothing registers this controller first, so the
+  // lookup threw and the login screen crashed (blank in release) whenever the
+  // window was narrow enough for this layout — e.g. with DevTools docked.
+  final ScreenSizeController myController = Get.put(ScreenSizeController());
   final TextEditingController _emailController = TextEditingController();
   FocusNode fieldOne = FocusNode();
   FocusNode fieldTow = FocusNode();

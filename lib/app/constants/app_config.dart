@@ -82,9 +82,12 @@ class AppConfig {
       "AIzaSyCw6mXOPCtbKn5i0bWcAcnfXCkb0y5G7Lg";
   static const String dash = '-';
 
+  /// Deployed builds pass `--dart-define=API_ENDPOINT=/api`; the default is
+  /// for local runs (Android Studio, plain `flutter run`), which point at the
+  /// prohealth tenant's API.
   static const String _rawEndpoint = String.fromEnvironment(
     'API_ENDPOINT',
-    defaultValue: 'https://demo.symmetry.care',
+    defaultValue: 'https://prohealth.symmetry.care/api',
   );
 
   static const String version =

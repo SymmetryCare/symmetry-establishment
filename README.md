@@ -10,7 +10,7 @@ Part of the SymmetryCare platform. GitHub: https://github.com/SymmetryCare/symme
 
 ```sh
 flutter run -d chrome \
-  --dart-define=API_ENDPOINT=https://dev.symmetry.care \
+  --dart-define=API_ENDPOINT=https://prohealth.symmetry.care/api \
   --dart-define=APP_VERSION=standalone-dev
 ```
 
