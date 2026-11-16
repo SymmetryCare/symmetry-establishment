@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'package:symmetry_establishment/app/services/api/api.dart';
@@ -15,9 +16,38 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 /// [EstablishmentManagerRepository], which the extraction did carry over.
 /// Error handling matches the sibling managers here: log and return an empty
 /// result, because the call sites feed these into Stream/FutureBuilders.
+///
+/// Keys are the backend's own (`weekDay`, `officeStartTime`, `holidayName`,
+/// …, see src/modules/hr/attendance). The reconstruction had guessed
+/// PascalCase names (`WeekDays`, `ShiftStartTime`, `HolidayName`): nothing
+/// read back, and every create failed because its fields never arrived.
 
 String _s(dynamic v) => v == null ? '' : '$v';
 int _i(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+
+/// A holiday's date as yyyy-MM-dd (the API sends 2026-11-16T00:00:00.000Z),
+/// the form the add/edit popups use too.
+String _day(dynamic v) {
+  final s = _s(v);
+  return s.length >= 10 && s[4] == '-' ? s.substring(0, 10) : s;
+}
+
+/// What the server said went wrong (its `message`), not Dio's long
+/// "DioException [bad response]…" text, which the popups showed as is.
+ApiData _failed(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    final message = data is Map ? data['message'] : null;
+    return ApiData(
+      success: false,
+      message: message is List
+          ? message.join(', ')
+          : (message?.toString() ?? 'Something went wrong. Please try again.'),
+      statusCode: e.response?.statusCode ?? 0,
+    );
+  }
+  return ApiData(success: false, message: 'Something went wrong. Please try again.', statusCode: 0);
+}
 
 // ── work weeks ─────────────────────────────────────────────────────────────
 
@@ -32,10 +62,10 @@ Future<List<WorkWeekScheduleData>> workWeekScheduleGet(
       for (var item in (response.data as List)) {
         itemsList.add(WorkWeekScheduleData(
           workWeekScheduleId: _i(item['WorkWeekScheduleId']),
-          companyId: _i(item['CompanyId']),
-          weekDays: _s(item['WeekDays']),
-          officeStartTime: _s(item['OfficeStartTime']),
-          officeEndTime: _s(item['OfficeEndTime']),
+          companyId: _i(item['companyId']),
+          weekDays: _s(item['weekDay']),
+          officeStartTime: _s(item['officeStartTime']),
+          officeEndTime: _s(item['officeEndTime']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -60,12 +90,12 @@ Future<List<WorkWeekShiftScheduleData>> workWeekShiftScheduleGet(
     if (response.statusCode == 200 || response.statusCode == 201) {
       for (var item in (response.data as List)) {
         itemsList.add(WorkWeekShiftScheduleData(
-          weekShiftScheduleId: _i(item['WeekShiftScheduleId']),
-          companyId: _i(item['CompanyId']),
-          weekDays: _s(item['WeekDays']),
-          shiftName: _s(item['ShiftName']),
-          shiftStartTime: _s(item['ShiftStartTime']),
-          shiftEndTime: _s(item['ShiftEndTime']),
+          weekShiftScheduleId: _i(item['WorkWeekShiftScheduleId']),
+          companyId: _i(item['companyId']),
+          weekDays: _s(item['weekDay']),
+          shiftName: _s(item['shiftName']),
+          shiftStartTime: _s(item['officeStartTime']),
+          shiftEndTime: _s(item['officeEndTime']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -91,11 +121,11 @@ Future<ApiData> addWorkWeekShiftPost(
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.addWorkWeekShiftPost(),
       data: {
-        "CompanyId": companyId,
-        "WeekDays": weekDays,
-        "ShiftName": shiftName,
-        "ShiftStartTime": shiftStartTime,
-        "ShiftEndTime": shiftEndTime,
+        "companyId": companyId,
+        "weekDay": weekDays,
+        "shiftName": shiftName,
+        "officeStartTime": shiftStartTime,
+        "officeEndTime": shiftEndTime,
       },
     );
     return ApiData(
@@ -106,7 +136,7 @@ Future<ApiData> addWorkWeekShiftPost(
     );
   } catch (e) {
     print("addWorkWeekShiftPost error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -127,7 +157,7 @@ Future<ApiData> deleteWorkWeekSiftSchedule({
     );
   } catch (e) {
     print("deleteWorkWeekSiftSchedule error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -146,11 +176,11 @@ Future<List<ShiftBachesData>> shiftBatchesGet(
       for (var item in (response.data as List)) {
         itemsList.add(ShiftBachesData(
           shiftBatchScheduleId: _i(item['ShiftBatchScheduleId']),
-          companyId: _i(item['CompanyId']),
-          weekDays: _s(item['WeekDays']),
-          shiftName: _s(item['ShiftName']),
-          officeStartTime: _s(item['OfficeStartTime']),
-          officeEndTime: _s(item['OfficeEndTime']),
+          companyId: _i(item['companyId']),
+          weekDays: _s(item['weekDay']),
+          shiftName: _s(item['shiftName']),
+          officeStartTime: _s(item['officeStartTime']),
+          officeEndTime: _s(item['officeEndTime']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -185,11 +215,11 @@ Future<ShiftBachesData> shiftPrefillBatchesGet(
           response.data is List ? (response.data as List).first : response.data;
       return ShiftBachesData(
         shiftBatchScheduleId: _i(item['ShiftBatchScheduleId']),
-        companyId: _i(item['CompanyId']),
-        weekDays: _s(item['WeekDays']),
-        shiftName: _s(item['ShiftName']),
-        officeStartTime: _s(item['OfficeStartTime']),
-        officeEndTime: _s(item['OfficeEndTime']),
+        companyId: _i(item['companyId']),
+        weekDays: _s(item['weekDay']),
+        shiftName: _s(item['shiftName']),
+        officeStartTime: _s(item['officeStartTime']),
+        officeEndTime: _s(item['officeEndTime']),
         success: true,
         message: response.statusMessage ?? '',
       );
@@ -214,11 +244,11 @@ Future<ApiData> addShiftBatch(
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.addShiftBatches(),
       data: {
-        "CompanyId": companyId,
-        "ShiftName": shiftName,
-        "WeekDays": weekDays,
-        "OfficeStartTime": startTime,
-        "OfficeEndTime": endTime,
+        "companyId": companyId,
+        "shiftName": shiftName,
+        "weekDay": weekDays,
+        "officeStartTime": startTime,
+        "officeEndTime": endTime,
       },
     );
     return ApiData(
@@ -229,7 +259,7 @@ Future<ApiData> addShiftBatch(
     );
   } catch (e) {
     print("addShiftBatch error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -247,10 +277,10 @@ Future<ApiData> updateShiftBatch(
       path: EstablishmentManagerRepository.modifyShiftBatches(
           shiftBatchScheduleId: shiftBatchScheduleId),
       data: {
-        "ShiftName": shiftName,
-        "WeekDays": weekDays,
-        "OfficeStartTime": startTime,
-        "OfficeEndTime": endTime,
+        "shiftName": shiftName,
+        "weekDay": weekDays,
+        "officeStartTime": startTime,
+        "officeEndTime": endTime,
       },
     );
     return ApiData(
@@ -261,7 +291,7 @@ Future<ApiData> updateShiftBatch(
     );
   } catch (e) {
     print("updateShiftBatch error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -280,7 +310,7 @@ Future<ApiData> deleteShiftBatch(
     );
   } catch (e) {
     print("deleteShiftBatch error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -295,10 +325,10 @@ Future<List<DefineHolidayData>> holidaysListGet(BuildContext context) async {
     if (response.statusCode == 200 || response.statusCode == 201) {
       for (var item in (response.data as List)) {
         itemsList.add(DefineHolidayData(
-          holidayId: _i(item['HolidayId']),
+          holidayId: _i(item['holidayId']),
           companyId: _i(item['CompanyId']),
-          holidayName: _s(item['HolidayName']),
-          date: _s(item['Date']),
+          holidayName: _s(item['holidayName']),
+          date: _day(item['date']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -330,10 +360,10 @@ Future<DefinePrefillHolidayData> holidaysPrefillGet(
       final item =
           response.data is List ? (response.data as List).first : response.data;
       return DefinePrefillHolidayData(
-        holidayId: _i(item['HolidayId']),
+        holidayId: _i(item['holidayId']),
         companyId: _i(item['CompanyId']),
-        holidayName: _s(item['HolidayName']),
-        date: _s(item['Date']),
+        holidayName: _s(item['holidayName']),
+        date: _day(item['date']),
         success: true,
         message: response.statusMessage ?? '',
       );
@@ -358,9 +388,9 @@ Future<ApiData> addHolidaysPost(
       path: EstablishmentManagerRepository.addHolidaysPost(),
       data: {
         "CompanyId": companyId,
-        "HolidayName": holidayName,
-        "Date": date,
-        "Year": year,
+        "holidayName": holidayName,
+        "date": date,
+        "year": year,
       },
     );
     return ApiData(
@@ -371,7 +401,7 @@ Future<ApiData> addHolidaysPost(
     );
   } catch (e) {
     print("addHolidaysPost error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -387,7 +417,12 @@ Future<ApiData> updateHolidays(
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.updateHolidaysPatch(
           holidayId: holidayId),
-      data: {"HolidayName": holidayName, "Date": date, "Year": year},
+      // The year is the date's own; callers passed a fixed 2024.
+      data: {
+        "holidayName": holidayName,
+        "date": date,
+        "year": DateTime.tryParse(date)?.year ?? year,
+      },
     );
     return ApiData(
       success: response.statusCode == 200 || response.statusCode == 201,
@@ -397,7 +432,7 @@ Future<ApiData> updateHolidays(
     );
   } catch (e) {
     print("updateHolidays error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -415,6 +450,6 @@ Future<ApiData> deleteHolidays(BuildContext context, int holidayId) async {
     );
   } catch (e) {
     print("deleteHolidays error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'package:symmetry_establishment/app/services/api/api.dart';
@@ -12,9 +13,36 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 /// `.../company_identity/widgets/ci_tab_widget`; the original lived in the
 /// `prohealth` monolith and did not come across with the extracted screens.
 /// Endpoints come from [EstablishmentManagerRepository].
+///
+/// Keys are the backend's own (VisitDto: `visitId`, `typeOfVisit`,
+/// `serviceId`, `eligibleClinician[{employeeTypeId, eligibleClinician,
+/// color}]`; CreateVisitDto takes `employeeTypeId` as a list of ids). The
+/// reconstruction had guessed PascalCase names, so the table showed empty
+/// rows and adding a visit was refused with a 400.
 
 String _s(dynamic v) => v == null ? '' : '$v';
 int _i(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
+
+/// What the server said went wrong (its `message`), not Dio's long
+/// "DioException [bad response]…" text, which the popups showed as is.
+ApiData _failed(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    final message = data is Map ? data['message'] : null;
+    return ApiData(
+      success: false,
+      message: message is List
+          ? message.join(', ')
+          : (message?.toString() ?? 'Something went wrong. Please try again.'),
+      statusCode: e.response?.statusCode ?? 0,
+    );
+  }
+  return ApiData(success: false, message: 'Something went wrong. Please try again.', statusCode: 0);
+}
+
+/// Clinician type ids for the API (the chips hold ints; be lenient anyway).
+List<int> _ids(List<dynamic> raw) =>
+    raw.map(_i).where((id) => id > 0).toList();
 
 /// The API returns eligible clinicians as a list of objects; the visit screens
 /// render each as a coloured chip.
@@ -22,10 +50,9 @@ List<EligibleClinician> _clinicians(dynamic raw) {
   if (raw is! List) return <EligibleClinician>[];
   return raw
       .map((c) => EligibleClinician(
-            employeeTypeId: _i(c is Map ? c['EmployeeTypeId'] : null),
-            eligibleClinician:
-                _s(c is Map ? (c['EligibleClinician'] ?? c['EmployeeType']) : c),
-            color: _s(c is Map ? c['Color'] : null),
+            employeeTypeId: _i(c is Map ? c['employeeTypeId'] : null),
+            eligibleClinician: _s(c is Map ? c['eligibleClinician'] : c),
+            color: _s(c is Map ? c['color'] : null),
           ))
       .toList();
 }
@@ -44,10 +71,10 @@ Future<List<CiVisit>> getVisit(
       final List items = data is List ? data : (data['data'] ?? []) as List;
       for (var item in items) {
         itemsList.add(CiVisit(
-          visitId: _i(item['VisitId']),
-          typeofVisit: _s(item['VisitType'] ?? item['TypeOfVisit']),
-          serviceId: _s(item['ServiceId']),
-          eligibleClinician: _clinicians(item['EligibleClinician']),
+          visitId: _i(item['visitId']),
+          typeofVisit: _s(item['typeOfVisit']),
+          serviceId: _s(item['serviceId']),
+          eligibleClinician: _clinicians(item['eligibleClinician']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -79,11 +106,11 @@ Future<VisitListDataPrefill> getVisitListPrefill(
       final item =
           response.data is List ? (response.data as List).first : response.data;
       final List<EligibleClinician> clinician =
-          _clinicians(item['EligibleClinician']);
+          _clinicians(item['eligibleClinician']);
       return VisitListDataPrefill(
-        visitId: _i(item['VisitId']),
-        visitType: _s(item['VisitType']),
-        serviceId: _s(item['ServiceId']),
+        visitId: _i(item['visitId']),
+        visitType: _s(item['typeOfVisit']),
+        serviceId: _s(item['serviceId']),
         eligibleClinicia: clinician,
         eligibleClinician: clinician,
         success: true,
@@ -108,9 +135,9 @@ Future<List<VisitListDataByServiceId>> getVisitListByServiceId(
     if (response.statusCode == 200 || response.statusCode == 201) {
       for (var item in (response.data as List)) {
         itemsList.add(VisitListDataByServiceId(
-          visitId: _i(item['VisitId']),
-          visitType: _s(item['VisitType']),
-          serviceId: _s(item['ServiceId']),
+          visitId: _i(item['visitId']),
+          visitType: _s(item['typeOfVisit']),
+          serviceId: _s(item['serviceId']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -135,10 +162,10 @@ Future<ApiData> addVisitPost({
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.postCiVisit(),
       data: {
-        "CompanyId": companyId,
-        "VisitType": typeOfVisit,
-        "EligibleClinician": eligibleClinician,
-        "ServiceId": serviceId,
+        "companyId": companyId,
+        "typeOfVisit": typeOfVisit,
+        "employeeTypeId": _ids(eligibleClinician),
+        "serviceId": serviceId,
       },
     );
     return ApiData(
@@ -149,7 +176,7 @@ Future<ApiData> addVisitPost({
     );
   } catch (e) {
     print("addVisitPost error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -165,9 +192,9 @@ Future<ApiData> updateVisitPatch({
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.updateCiVisit(typeVisit: typeVisist),
       data: {
-        "VisitType": visitType,
-        "EligibleClinician": eligibleClinical,
-        "ServiceId": serviceId,
+        "typeOfVisit": visitType,
+        "employeeTypeId": _ids(eligibleClinical),
+        "serviceId": serviceId,
       },
     );
     return ApiData(
@@ -178,7 +205,7 @@ Future<ApiData> updateVisitPatch({
     );
   } catch (e) {
     print("updateVisitPatch error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -195,6 +222,6 @@ Future<ApiData> deleteVisit(BuildContext context, int visitId) async {
     );
   } catch (e) {
     print("deleteVisit error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
