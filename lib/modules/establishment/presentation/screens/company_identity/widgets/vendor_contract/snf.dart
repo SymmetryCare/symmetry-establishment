@@ -151,7 +151,7 @@ class _CiSnfState extends State<CiSnf> {
                                     serialNumber.toString().padLeft(2, '0');
                                 MCorporateComplianceModal snfData =
                                     paginatedData[index];
-                                var vcSNF = snapshot.data![index];
+                                var vcSNF = paginatedData[index];
                                 var fileUrl = vcSNF.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 

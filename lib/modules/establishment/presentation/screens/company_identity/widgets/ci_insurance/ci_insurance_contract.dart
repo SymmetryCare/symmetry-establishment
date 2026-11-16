@@ -230,7 +230,7 @@ class _CiInsuranceContractState extends State<CiInsuranceContract> {
                                                     builder:
                                                         (BuildContext context) {
                                                       return FutureBuilder<ManageContractPrefill>(
-                                                          future: getPrefillContract(context, snapshot.data![index].insuranceVendorContracId),
+                                                          future: getPrefillContract(context, paginatedData[index].insuranceVendorContracId),
                                                           builder: (context, snapshotPrefill) {
                                                             if (snapshotPrefill.connectionState == ConnectionState.waiting) {
                                                               return Center(

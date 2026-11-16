@@ -152,7 +152,7 @@ class _CiMiscState extends State<CiMisc> {
                                     serialNumber.toString().padLeft(2, '0');
                                 MCorporateComplianceModal miscData =
                                     paginatedData[index];
-                                var dataMISC = snapshot.data![index];
+                                var dataMISC = paginatedData[index];
                                 var fileUrl = dataMISC.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 

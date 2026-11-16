@@ -130,7 +130,7 @@ class _CICCCAPReportsState extends State<CICCCAPReports> {
                                 int serialNumber = index + 1 + (currentPage - 1) * itemsPerPage;
                                 String formattedSerialNumber = serialNumber.toString().padLeft(2, '0');
                                 MCorporateComplianceModal CapReports = paginatedData[index];
-                                var ccCapReport = snapshot.data![index];
+                                var ccCapReport = paginatedData[index];
                                 var fileUrl = ccCapReport.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 

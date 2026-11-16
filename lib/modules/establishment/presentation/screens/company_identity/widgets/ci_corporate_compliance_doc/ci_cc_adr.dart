@@ -131,7 +131,7 @@ class _CICCADRState extends State<CICCADR> {
                                 int serialNumber = index + 1 + (currentPage - 1) * itemsPerPage;
                                 String formattedSerialNumber = serialNumber.toString().padLeft(2, '0');
                                 MCorporateComplianceModal manageCCADR = paginatedData[index];
-                                var ccADR = snapshot.data![index];
+                                var ccADR = paginatedData[index];
                                 var fileUrl = ccADR.docurl;
                                 final fileExtension = fileUrl.split('/').last;
                                 return Column(

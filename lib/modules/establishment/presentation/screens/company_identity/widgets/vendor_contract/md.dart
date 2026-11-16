@@ -151,7 +151,7 @@ class _CiMdState extends State<CiMd> {
                                     serialNumber.toString().padLeft(2, '0');
                                 MCorporateComplianceModal mdData =
                                     paginatedData[index];
-                                var vcMD = snapshot.data![index];
+                                var vcMD = paginatedData[index];
                                 var fileUrl = vcMD.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 

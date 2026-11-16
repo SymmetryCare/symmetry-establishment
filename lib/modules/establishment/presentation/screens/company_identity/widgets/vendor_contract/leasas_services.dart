@@ -161,7 +161,7 @@ class _CiLeasesAndServicesState extends State<CiLeasesAndServices> {
                                     (currentPage - 1) * itemsPerPage;
                                 String formattedSerialNumber =
                                     serialNumber.toString().padLeft(2, '0');
-                                var vcLeases = snapshot.data![index];
+                                var vcLeases = paginatedData[index];
                                 var fileUrl = vcLeases.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 

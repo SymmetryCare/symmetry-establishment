@@ -390,7 +390,7 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
                                                     ):SizedBox(  height: AppSize.s22,),
                                                     SizedBox(height: AppSize.s8,),
                                                     // Google Map Display
-                                                    if (snapshot.data![index].lat != null)
+                                                    if (paginatedData[index].lat != null)
                                                       Padding(
                                                         padding: const EdgeInsets.only(left: AppPadding.p25,right: AppPadding.p25,),
                                                         child: Column(
@@ -438,7 +438,7 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
                                                             Center(
                                                               child: InkWell(onTap: () async {
                                                                 String googleMapsUrl =
-                                                                    'https://www.google.com/maps/search/?api=1&query=${snapshot.data![index].lat}, ${snapshot.data![index].long}';
+                                                                    'https://www.google.com/maps/search/?api=1&query=${paginatedData[index].lat}, ${paginatedData[index].long}';
                                                                 if (await canLaunchUrlString(googleMapsUrl)) {
                                                                   await launchUrlString(googleMapsUrl);
                                                                 } else {

@@ -128,7 +128,7 @@ class _CICCMedicalCRState extends State<CICCMedicalCR> {
                               scrollDirection: Axis.vertical,
                               itemCount: paginatedData.length,
                               itemBuilder: (context, index) {
-                                var ccMCR = snapshot.data![index];
+                                var ccMCR = paginatedData[index];
                                 var fileUrl = ccMCR.docurl;
                                 final fileExtension = fileUrl.split('/').last;
                                 int serialNumber = index + 1 + (currentPage - 1) * itemsPerPage;

@@ -180,6 +180,9 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                 if (snapshot.hasData) {
                   int totalItems = snapshot.data!.length;
                   int totalPages = (totalItems / itemsPerPage).ceil();
+                  // Deleting the last visit on the last page leaves that page
+                  // empty: show the one before it instead.
+                  if (totalPages > 0 && currentPage > totalPages) currentPage = totalPages;
                   List<CiVisit> paginatedData = snapshot.data!.skip((currentPage - 1) * itemsPerPage).take(itemsPerPage).toList();
                   return Column(
                     children: [
@@ -261,7 +264,6 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                                                                           int serialNumber = index + 1 + (currentPage - 1) * itemsPerPage;
                                                                           String formattedSerialNumber = serialNumber.toString().padLeft(2, '0');
                                                                           CiVisit visitData = paginatedData[index];
-                                                                          print("Length ::: ${snapshot.data![index].eligibleClinician.toString()}");
                                                                           List<Widget> clinical = [];
                                                                           for (var i in visitData.eligibleClinician!) {
                                                                             var hexColor = i.color.replaceAll("#", "");
@@ -461,8 +463,13 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                                                                                 _isLoading = true;
                                                                               });
                                                                               try {
-                                                                                await deleteVisit(context, snapshot.data![index].visitId);
-                                                                                getVisit(context, 1, 10).then((data) {
+                                                                                // This row's visit: `index` counts rows on
+                                                                                // this page, not in the whole list, so
+                                                                                // snapshot.data![index] deleted another one.
+                                                                                await deleteVisit(context, visitData.visitId);
+                                                                                // The whole list, as the screen loads it
+                                                                                // (it pages locally); 10 lost the rest.
+                                                                                getVisit(context, 1, 9999).then((data) {
                                                                                   _visitController.add(data);
                                                                                 }).catchError((error) {
                                                                                   // Handle error

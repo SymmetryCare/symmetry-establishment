@@ -135,7 +135,7 @@ class _CICCLicenseState extends State<CICCLicense> {
                               scrollDirection: Axis.vertical,
                               itemCount: paginatedData.length,
                               itemBuilder: (context, index) {
-                                var cclicenses = snapshot.data![index];
+                                var cclicenses = paginatedData[index];
                                 var fileUrl = cclicenses.docurl;
                                 final fileExtension = fileUrl.split('/').last;
                                 int serialNumber = index + 1 + (currentPage - 1) * itemsPerPage;

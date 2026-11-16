@@ -150,7 +150,7 @@ class _CiDmeState extends State<CiDme> {
                                     (currentPage - 1) * itemsPerPage;
                                 String formattedSerialNumber =
                                     serialNumber.toString().padLeft(2, '0');
-                                var vcDME = snapshot.data![index];
+                                var vcDME = paginatedData[index];
                                 var fileUrl = vcDME.docurl;
                                 final fileExtension = fileUrl.split('/').last;
 
