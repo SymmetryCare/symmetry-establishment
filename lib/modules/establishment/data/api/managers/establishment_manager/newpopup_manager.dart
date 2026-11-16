@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'package:symmetry_establishment/app/services/api/api.dart';
+import 'package:symmetry_establishment/app/services/base64/encode_decode_base64.dart';
 import 'package:symmetry_establishment/data/api_data/api_data.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/repository/establishment_manager/establishment_repository.dart';
@@ -9,7 +10,14 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 
 /// Company Identity document popups — list, prefill and delete.
 ///
-/// Reconstructed from the call sites in
+/// Paths, keys and the upload follow the original prohealth code, which
+/// survives in symmetry-emr's copy of this manager (the backend's
+/// org-document-setup / org-office-document use snake_case:
+/// orgDocumentSetupid, doc_name, idOfDocument, expiry_date, office_id, …).
+/// An earlier reconstruction had guessed PascalCase keys and other routes,
+/// so the type dropdown stayed empty and uploads never saved.
+///
+/// Originally reconstructed from the call sites in
 /// `modules/establishment/presentation/screens/company_identity`; the original
 /// lived in the `prohealth` monolith and did not come across with the extracted
 /// screens. The endpoints come from
@@ -21,8 +29,31 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 String _s(dynamic v) => v == null ? '' : '$v';
 int _i(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
 
-/// GET identity/GetDocumentListByCompanyAndOffice — the rows behind a document
-/// tab (corporate & compliance, vendor contracts, policies & procedures).
+/// An expiry date, or null for a document that does not expire (the API
+/// refuses an empty string as a date).
+String? _dateOrNull(String? date) =>
+    date == null || date.trim().isEmpty ? null : date;
+
+/// What the server said went wrong (its `message`), not Dio's long text.
+ApiData _failed(Object e) {
+  if (e is DioException) {
+    final data = e.response?.data;
+    final message = data is Map ? data['message'] : null;
+    return ApiData(
+      success: false,
+      message: message is List
+          ? message.join(', ')
+          : (message?.toString() ?? 'Something went wrong. Please try again.'),
+      statusCode: e.response?.statusCode ?? 0,
+    );
+  }
+  return ApiData(success: false, message: 'Something went wrong. Please try again.', statusCode: 0);
+}
+
+/// GET org-office-document/ByDocumentTypeAndSubTypePageWise/{type}/{sub}/{office}/…
+/// — the rows behind a document tab (corporate & compliance, vendor
+/// contracts, policies & procedures). identity/GetDocumentListByCompanyAndOffice,
+/// used before, reads another table, so uploaded documents never showed.
 Future<List<MCorporateComplianceModal>> getListMCorporateCompliancefetch(
   BuildContext context,
   int docTypeId,
@@ -33,15 +64,14 @@ Future<List<MCorporateComplianceModal>> getListMCorporateCompliancefetch(
 ) async {
   List<MCorporateComplianceModal> itemsList = [];
   try {
-    final int companyId = await TokenManager.getCompanyId();
+    // The screens page locally, so fetch them all.
     final response = await Api(context).get(
-      path: EstablishmentManagerRepository.corporateGetListbyCompany(
-        companyId: companyId,
-        officeId: officeId,
-        docTypeID: docTypeId,
-        docSubTypeID: subDocTypeId,
-        pageNo: pageNo,
-        rowsNo: rowNo,
+      path: EstablishmentManagerRepository.getListMCorporateCompliance(
+        DocumentTypeId: docTypeId,
+        DocumentSubTypeId: subDocTypeId,
+        officeID: officeId,
+        pageNbr: 1,
+        NbrofRows: 99999,
       ),
     );
     if (response.statusCode == 200 || response.statusCode == 201) {
@@ -50,16 +80,13 @@ Future<List<MCorporateComplianceModal>> getListMCorporateCompliancefetch(
       for (var item in items) {
         itemsList.add(
           MCorporateComplianceModal(
-            idOfDocument: item['DocumentId'] ?? item['documentId'] ?? 0,
-            orgOfficeDocumentId: item['OrgOfficeDocumentId'] ??
-                item['orgOfficeDocumentId'] ??
-                0,
-            docName: item['DocumentName'] ?? item['docName'] ?? '',
-            fileName: item['FileName'] ?? item['fileName'] ?? '',
-            docurl: item['DocumentUrl'] ?? item['url'] ?? '',
-            doccreatedAt: '${item['CreatedAt'] ?? item['createdAt'] ?? ''}',
-            docHistory: (item['DocumentHistory'] ?? item['docHistory'] ?? [])
-                as List<dynamic>,
+            idOfDocument: _s(item['idOfDocument']),
+            orgOfficeDocumentId: _i(item['orgOfficeDocumentId']),
+            docName: _s(item['doc_name']),
+            fileName: _s(item['file_name']),
+            docurl: _s(item['url']),
+            doccreatedAt: _s(item['doc_created_at']),
+            docHistory: (item['docHistory'] ?? []) as List<dynamic>,
             success: true,
             message: response.statusMessage ?? '',
           ),
@@ -102,18 +129,16 @@ Future<MCorporateCompliancePreFillModal> getPrefillNewOrgOfficeDocument(
           ? (response.data as List).first
           : response.data;
       return MCorporateCompliancePreFillModal(
-        idOfDocument: _s(item['DocumentId'] ?? item['documentId']),
-        orgOfficeDocumentId:
-            item['OrgOfficeDocumentId'] ?? orgOfficeDocumentId,
-        documentSetupId:
-            item['OrgDocumentSetupId'] ?? item['documentSetupId'] ?? 0,
-        docName: item['DocumentName'] ?? item['docName'] ?? '',
-        fileName: item['FileName'] ?? item['fileName'] ?? '',
-        url: item['DocumentUrl'] ?? item['url'] ?? '',
-        expType: item['ExpiryType'] ?? item['expType'] ?? '',
-        expiry_date: '${item['ExpiryDate'] ?? item['expiry_date'] ?? ''}',
-        threshould: _i(item['Threshold'] ?? item['threshould']),
-        isOthersDocs: item['IsOthersDocs'] ?? item['isOthersDocs'] ?? false,
+        idOfDocument: _s(item['idOfDocument']),
+        orgOfficeDocumentId: item['orgOfficeDocumentId'] ?? orgOfficeDocumentId,
+        documentSetupId: _i(item['orgDocumentSetupid']),
+        docName: _s(item['doc_name']),
+        fileName: _s(item['file_name']),
+        url: _s(item['url']),
+        expType: _s(item['expiry_type']),
+        expiry_date: _s(item['expiry_date']).replaceAll('Z', ''),
+        threshould: _i(item['threshold']),
+        isOthersDocs: item['isOthersDocs'] == true,
         success: true,
         message: response.statusMessage ?? '',
       );
@@ -142,13 +167,15 @@ Future<ApiData> deleteOrgDoc({
     );
   } catch (e) {
     print("deleteOrgDoc error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
-/// GET /org-document-setup/ByDocumentTypeAndSubType/{typeId}/{subTypeId}/{page}/{rows}
+/// GET /org-document-setup/ByDocumentTypeAndSubType/{typeId}/{subTypeId}
 ///
-/// Fills the document-type dropdown in the "add document" popup.
+/// Fills the document-type dropdown in the "add document" popup with the
+/// company's document definitions (Establishment → Org Document →
+/// Document Definition) of this type and sub-type.
 Future<List<TypeofDocpopup>> getTypeofDoc(
   BuildContext context,
   int docTypeId,
@@ -157,20 +184,17 @@ Future<List<TypeofDocpopup>> getTypeofDoc(
   List<TypeofDocpopup> itemsList = [];
   try {
     final response = await Api(context).get(
-        path: EstablishmentManagerRepository.newOrgDocGetTypeWise(
-            DocumentTypeId: docTypeId,
-            DocumentSubTypeId: docSubTypeId,
-            pageNbr: 1,
-            NbrofRows: 9999));
+        path: EstablishmentManagerRepository.getdocPayratesdropdown(
+            DocumentTypeId: docTypeId, DocumentSubTypeId: docSubTypeId));
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = response.data;
       final List items = data is List ? data : (data['data'] ?? []) as List;
       for (var item in items) {
         itemsList.add(TypeofDocpopup(
-          orgDocumentSetupid: _i(item['OrgDocumentSetupId']),
-          docname: _s(item['DocumentName'] ?? item['DocName']),
-          idOfDocument: _s(item['DocumentId'] ?? item['IdOfDocument']),
-          expirytype: _s(item['ExpiryType']),
+          orgDocumentSetupid: _i(item['orgDocumentSetupid']),
+          docname: _s(item['doc_name']),
+          idOfDocument: _s(item['idOfDocument']),
+          expirytype: _s(item['expiry_type']),
           success: true,
           message: response.statusMessage ?? '',
         ));
@@ -207,14 +231,14 @@ Future<ApiData> addOrgDocPPPost({
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.addDocOrg(),
       data: {
-        "CompanyId": companyId,
-        "OfficeId": officeId,
-        "OrgDocumentSetupId": orgDocumentSetupid,
-        "DocumentId": idOfDocument,
-        "ExpiryDate": expiryDate ?? '',
-        "CreatedAt": docCreated,
-        "DocumentUrl": url,
-        "FileName": fileName ?? '',
+        "company_id": companyId,
+        "office_id": officeId,
+        "orgDocumentSetupid": orgDocumentSetupid,
+        "idOfDocument": idOfDocument,
+        "expiry_date": _dateOrNull(expiryDate),
+        "doc_created_at": docCreated,
+        "url": url,
+        "file_name": fileName ?? '',
       },
     );
     return ApiData(
@@ -223,12 +247,12 @@ Future<ApiData> addOrgDocPPPost({
       statusCode: response.statusCode ?? 0,
       data: response.data,
       orgOfficeDocumentId: response.data is Map
-          ? (response.data['OrgOfficeDocumentId'] as int?)
+          ? (response.data['orgOfficeDocumentId'] as int?)
           : null,
     );
   } catch (e) {
     print("addOrgDocPPPost error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -253,19 +277,19 @@ Future<ApiData> addOtherOfficeDocPost({
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.addOtherDoc(),
       data: {
-        "CompanyId": companyId,
-        "OfficeId": officeId,
-        "DocumentTypeId": docTypeid,
-        "DocumentSubTypeId": docSubTypeid,
-        "DocumentName": documentName,
-        "ExpiryType": expiryType,
-        "Threshold": threshold,
-        "ExpiryDate": expiryDate ?? '',
-        "ExpiryReminder": expiryReminder,
-        "DocumentId": idOfDoc,
-        "CreatedAt": docCreated,
-        "FileName": fileName ?? '',
-        "DocumentUrl": url,
+        "company_id": companyId,
+        "office_id": officeId,
+        "document_type_id": docTypeid,
+        "document_subtype_id": docSubTypeid,
+        "doc_name": documentName,
+        "expiry_type": expiryType,
+        "threshold": threshold,
+        "expiry_date": _dateOrNull(expiryDate),
+        "expiry_reminder": expiryReminder,
+        "idOfDocument": idOfDoc,
+        "doc_created_at": docCreated,
+        "file_name": fileName ?? '',
+        "url": url,
       },
     );
     return ApiData(
@@ -274,12 +298,12 @@ Future<ApiData> addOtherOfficeDocPost({
       statusCode: response.statusCode ?? 0,
       data: response.data,
       orgOfficeDocumentId: response.data is Map
-          ? (response.data['OrgOfficeDocumentId'] as int?)
+          ? (response.data['orgOfficeDocumentId'] as int?)
           : null,
     );
   } catch (e) {
     print("addOtherOfficeDocPost error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -296,16 +320,18 @@ Future<ApiData> updateOrgDoc({
   required String officeid,
 }) async {
   try {
+    final int companyId = await TokenManager.getCompanyId();
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.patchDocOrg(orgDocID: orgDocId),
       data: {
-        "OfficeId": officeid,
-        "OrgDocumentSetupId": orgDocumentSetupid,
-        "DocumentId": idOfDocument,
-        "ExpiryDate": expiryDate ?? '',
-        "CreatedAt": docCreatedat,
-        "DocumentUrl": url,
-        "FileName": fileName ?? '',
+        "company_id": companyId,
+        "office_id": officeid,
+        "orgDocumentSetupid": orgDocumentSetupid,
+        "idOfDocument": idOfDocument,
+        "expiry_date": _dateOrNull(expiryDate),
+        "doc_created_at": docCreatedat,
+        "url": url,
+        "file_name": fileName ?? '',
       },
     );
     return ApiData(
@@ -317,7 +343,7 @@ Future<ApiData> updateOrgDoc({
     );
   } catch (e) {
     print("updateOrgDoc error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
@@ -340,23 +366,26 @@ Future<ApiData> updateOtherDoc({
   required String? fileName,
 }) async {
   try {
+    final int companyId = await TokenManager.getCompanyId();
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.patchOtherOrg(
           orgOfficeDocumentId: orgOfficeDocumentId),
       data: {
-        "OfficeId": officeid,
-        "OrgDocumentSetupId": orgDocumentSetupid,
-        "DocumentTypeId": docTypeID,
-        "DocumentSubTypeId": docSubTypeID,
-        "DocumentName": docName,
-        "ExpiryType": expiryType,
-        "Threshold": threshold,
-        "ExpiryDate": expiryDate ?? '',
-        "ExpiryReminder": expiryReminder,
-        "DocumentId": idOfDocument,
-        "CreatedAt": docCreatedat,
-        "DocumentUrl": url,
-        "FileName": fileName ?? '',
+        "company_id": companyId,
+        "office_id": officeid,
+        "orgDocumentSetupid": orgDocumentSetupid,
+        "document_type_id": docTypeID,
+        "document_subtype_id": docSubTypeID,
+        "doc_name": docName,
+        "expiry_type": expiryType,
+        "threshold": threshold,
+        "expiry_date": _dateOrNull(expiryDate),
+        "expiry_reminder": expiryReminder,
+        "idOfDocument": idOfDocument,
+        "doc_created_at": docCreatedat,
+        "url": url,
+        "file_name": fileName ?? '',
+        "isOthersDocs": true,
       },
     );
     return ApiData(
@@ -368,12 +397,12 @@ Future<ApiData> updateOtherDoc({
     );
   } catch (e) {
     print("updateOtherDoc error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }
 
-/// POST (multipart) /office-document/{orgOfficeDocumentId} — upload the file
-/// itself, once the metadata row above exists and returned its id.
+/// POST /org-office-document/attach-documentbase64/{orgOfficeDocumentId} —
+/// the file itself as base64, once the row above exists and returned its id.
 Future<ApiData> uploadDocumentsoffice({
   required BuildContext context,
   required dynamic documentFile,
@@ -381,18 +410,12 @@ Future<ApiData> uploadDocumentsoffice({
   required String? fileName,
 }) async {
   try {
-    final formData = FormData.fromMap({
-      'file': documentFile is MultipartFile
-          ? documentFile
-          : MultipartFile.fromBytes(
-              documentFile as List<int>,
-              filename: fileName ?? 'document',
-            ),
-    });
-    final response = await Api(context).postWithFormData(
+    final String base64 =
+        await AppFilePickerBase64.getEncodeBase64(bytes: documentFile);
+    final response = await Api(context).post(
       path: EstablishmentManagerRepository.uploadedocOffice(
           orgOfficeDocumentId: orgOfficeDocumentId),
-      formData: formData,
+      data: {'base64String': base64, 'file_name': fileName ?? 'document'},
     );
     return ApiData(
       success: response.statusCode == 200 || response.statusCode == 201,
@@ -403,6 +426,6 @@ Future<ApiData> uploadDocumentsoffice({
     );
   } catch (e) {
     print("uploadDocumentsoffice error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failed(e);
   }
 }

@@ -10,7 +10,8 @@
 
 /// One row in a document list (the table the popups page through).
 class MCorporateComplianceModal {
-  final int idOfDocument;
+  /// The document's own ID as typed in (e.g. a licence number): text.
+  final String idOfDocument;
   final int orgOfficeDocumentId;
   final String docName;
   final String fileName;
