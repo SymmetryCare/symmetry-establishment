@@ -72,30 +72,33 @@ class DialogueTemplate extends StatelessWidget {
                 ],
               ),
             ),
-            isScrollable! ? SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: AppPadding.p18,
-                  horizontal: AppPadding.p18,
+            // The body takes the room between the title bar and the buttons
+            // and scrolls when it needs more, so the buttons always stay in
+            // view (a growing form, e.g. a chip row or error texts, used to
+            // push Save past the dialog's fixed height). A short body still
+            // sits centred, as it did before.
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppPadding.p18,
+                          horizontal: AppPadding.p18,
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: body,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: body,
-                ),
-              ),
-            )  :Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: AppPadding.p18,
-                horizontal: AppPadding.p18,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: body,
               ),
             ),
-            SizedBox(height:isScrollable!? 0:AppSize.s15),
             ///button
             Padding(
               padding:  EdgeInsets.symmetric(vertical: isScrollable! ?AppPadding.p10 :AppPadding.p20),
