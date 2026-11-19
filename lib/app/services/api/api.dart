@@ -70,6 +70,27 @@ class Api {
         },
 
         onError: (error, handler) async {
+          // Screens now load once instead of polling, so retry a GET that
+          // failed transiently (network/CORS hiccup, timeout, 5xx) before
+          // giving up. Writes are never retried; 4xx (incl. 401) fall through.
+          final req = error.requestOptions;
+          final status = error.response?.statusCode ?? 0;
+          final attempt = (req.extra['_getRetry'] as int?) ?? 0;
+          final transient = error.response == null || status >= 500;
+          if (req.method.toUpperCase() == 'GET' &&
+              transient &&
+              attempt < 2 &&
+              error.type != DioExceptionType.cancel &&
+              !_authExcludedPaths.any((p) => req.path.contains(p))) {
+            await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+            req.extra['_getRetry'] = attempt + 1;
+            try {
+              return handler.resolve(await _dio.fetch(req));
+            } catch (_) {
+              return handler.next(error);
+            }
+          }
+
           final response = error.response;
           if (response == null) return handler.next(error);
 
