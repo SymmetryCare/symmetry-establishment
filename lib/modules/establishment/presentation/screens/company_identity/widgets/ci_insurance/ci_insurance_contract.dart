@@ -11,6 +11,7 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/delete_success_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/pagination_widget.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class CiInsuranceContract extends StatefulWidget {
   final int insuranceVendorId;
@@ -30,7 +31,7 @@ class CiInsuranceContract extends StatefulWidget {
   State<CiInsuranceContract> createState() => _CiInsuranceContractState();
 }
 
-class _CiInsuranceContractState extends State<CiInsuranceContract> {
+class _CiInsuranceContractState extends State<CiInsuranceContract> with AutoRefreshMixin<CiInsuranceContract> {
   TextEditingController contractNameController = TextEditingController();
   TextEditingController contractIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -40,43 +41,44 @@ class _CiInsuranceContractState extends State<CiInsuranceContract> {
   final int itemsPerPage = 10;
   String? expiryType;
   bool _isLoading = false;
-  Timer? _fetchTimer;
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     _controller = StreamController<List<ManageInsuranceContractData>>.broadcast();
-    fetchVendorContractZone();
-    // Call every 3 seconds
-    _fetchTimer = Timer.periodic(Duration(seconds: 3), (timer) {
-      fetchVendorContractZone();
-    });
+    // Initial load + reload after add/edit/delete: refreshData() (AutoRefreshMixin).
   }
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() => fetchVendorContractZone();
+
   @override
   void didUpdateWidget(covariant CiInsuranceContract oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.insuranceVendorId != widget.insuranceVendorId) {
+    if (oldWidget.insuranceVendorId != widget.insuranceVendorId ||
+        oldWidget.officeId != widget.officeId) {
       fetchVendorContractZone();
     }
   }
-  void fetchVendorContractZone() {
+  Future<void> fetchVendorContractZone() async {
     if (widget.insuranceVendorId != 0 ) {
-      companyContractGetByVendorId(
-          context,
-          widget.officeId,
-          widget.insuranceVendorId,
-          1,9999
-      ).then((data) {
-        _controller.add(data);
-      }).catchError((error) {
-        _controller.add([]);
+      try {
+        final data = await companyContractGetByVendorId(
+            context,
+            widget.officeId,
+            widget.insuranceVendorId,
+            1,9999
+        );
+        if (mounted && !_controller.isClosed) _controller.add(data);
+      } catch (error) {
+        if (mounted && !_controller.isClosed) _controller.add([]);
         debugPrint("Error loading Zone: $error");
-      });
+      }
     }
   }
   @override
   void dispose() {
-    _fetchTimer?.cancel(); // avoid memory leaks
     _controller.close(); // also close stream
     super.dispose();
   }

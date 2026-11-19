@@ -4,6 +4,7 @@ import 'package:symmetry_establishment/modules/establishment/resources/establish
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/company_identity/new_org_doc.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
@@ -51,9 +52,9 @@ class CICcdLicenseProvider with ChangeNotifier {
         context,FrontendConfigStore.data!.config.corporateAndCompliance, FrontendConfigStore.data!.config.subDocId1Licenses, 1, 50,
         // context, AppConfig.corporateAndCompliance, AppConfig.subDocId1Licenses, 1, 50,
       );
-      documentStream.add(documents);
+      if (!documentStream.isClosed) documentStream.add(documents);
     } catch (e) {
-      documentStream.addError(e);
+      if (!documentStream.isClosed) documentStream.addError(e);
     }
   }
 
@@ -135,8 +136,18 @@ class CICcdLicense extends StatefulWidget {
   State<CICcdLicense> createState() => _CICcdLicenseState();
 }
 
-class _CICcdLicenseState extends State<CICcdLicense> {
+class _CICcdLicenseState extends State<CICcdLicense> with AutoRefreshMixin<CICcdLicense> {
   final ScrollController _horizontalScrollController = ScrollController();
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      await context.read<CICcdLicenseProvider>().fetchDocuments(context);
+    } catch (error) {
+      debugPrint('CICcdLicense load error: $error');
+    }
+  }
 
   @override
   void dispose() {
@@ -151,7 +162,7 @@ class _CICcdLicenseState extends State<CICcdLicense> {
     return StreamBuilder<List<NewOrgDocument>>(
       stream: provider.documentStream.stream,
       builder: (context, snapshot) {
-        provider.fetchDocuments(context);
+        // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
 
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(child: CircularProgressIndicator(color: ColorManager.blueprime));

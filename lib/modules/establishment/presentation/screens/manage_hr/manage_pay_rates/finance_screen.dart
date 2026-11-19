@@ -20,6 +20,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/four_not_four_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/resources/const_string.dart';
 import 'package:symmetry_establishment/modules/establishment/providers/delete_popup_provider.dart';
@@ -36,6 +37,21 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/widgets/text_form_field_const.dart';
 
 class FinanceProvider with ChangeNotifier {
+  // A load can finish after the screen is closed; ignore late notifications
+  // instead of throwing "used after being disposed".
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) super.notifyListeners();
+  }
+
   TextEditingController payRatesController = TextEditingController();
   TextEditingController perMilesController = TextEditingController();
   TextEditingController fixedPayRatesController = TextEditingController();
@@ -126,22 +142,23 @@ class FinanceProvider with ChangeNotifier {
     }
   }
 
-  void fetchPayRates(BuildContext context, String serviceId, int empTypeId) {
+  Future<void> fetchPayRates(BuildContext context, String serviceId, int empTypeId) async {
     if (serviceId.isEmpty || empTypeId == 0) {
       print("Service ID or Employee Type ID is not set. Cannot fetch pay rates.");
       return;
     }
 
-    companyPayratesGetByServiceAndEmployeeId(
-      context: context,
-      serviceId: serviceId,
-      empId: empTypeId,
-    ).then((data) {
-      _payRatesController.add(data); // Emit fetched data
-    }).catchError((error) {
+    try {
+      final data = await companyPayratesGetByServiceAndEmployeeId(
+        context: context,
+        serviceId: serviceId,
+        empId: empTypeId,
+      );
+      if (!_payRatesController.isClosed) _payRatesController.add(data); // Emit fetched data
+    } catch (error) {
       print("Error fetching pay rates: $error");
-      _payRatesController.addError(error); // Emit error to the stream
-    });
+      if (!_payRatesController.isClosed) _payRatesController.addError(error); // Emit error to the stream
+    }
   }
 
   void updateSelectedService(String serviceName, BuildContext context) {
@@ -209,8 +226,34 @@ class FinanceScreen extends StatefulWidget {
   State<FinanceScreen> createState() => _FinanceScreenState();
 }
 
-class _FinanceScreenState extends State<FinanceScreen> {
+class _FinanceScreenState extends State<FinanceScreen> with AutoRefreshMixin<FinanceScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
+
+  /// Owned by the ChangeNotifierProvider below (which disposes it); kept here
+  /// so refreshData() can reach it (this State's context is above the provider).
+  final FinanceProvider _financeProvider = FinanceProvider();
+  bool _initialLoadDone = false;
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  /// Service / employee-type changes re-fetch via the provider's dropdown setters.
+  @override
+  Future<void> refreshData() async {
+    try {
+      if (!_initialLoadDone) {
+        _initialLoadDone = true;
+        await Future.wait([
+          _financeProvider.loadPayRatesData(context),
+          _financeProvider.loadServicesMetaData(context),
+          _financeProvider.loadHrData(context),
+        ]);
+        if (!mounted) return;
+      }
+      await _financeProvider.fetchPayRates(
+          context, _financeProvider.serviceId, _financeProvider.empTypeId);
+    } catch (error) {
+      debugPrint('Pay rates load error: $error');
+    }
+  }
 
   @override
   void dispose() {
@@ -221,10 +264,8 @@ class _FinanceScreenState extends State<FinanceScreen> {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => FinanceProvider()
-        ..loadPayRatesData(context)
-        ..loadServicesMetaData(context)
-        ..loadHrData(context),
+      // Initial loads moved to refreshData() (AutoRefreshMixin).
+      create: (_) => _financeProvider,
       child: Consumer<FinanceProvider>(
         builder: (context, provider, child) {
           return Material(
@@ -403,8 +444,7 @@ class _FinanceScreenState extends State<FinanceScreen> {
                   Expanded(
                     child: Consumer<FinanceProvider>(
                       builder: (context, provider, _) {
-                        provider.fetchPayRates(context, provider.serviceId, provider.empTypeId);
-
+                        // Pay rates come from refreshData() / dropdown setters; no API calls here.
                         return StreamBuilder<List<PayRatesGetByServiceId>>(
                           stream: provider.payRatesStream,
                           builder: (context, snapshot) {

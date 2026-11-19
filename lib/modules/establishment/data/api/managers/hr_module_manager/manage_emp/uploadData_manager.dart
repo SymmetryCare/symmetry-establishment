@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/resources/const_string.dart';
 import 'package:symmetry_establishment/app/services/api/api.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/repository/hr_module_repository/manage_emp/upload_repo.dart';
 import 'package:symmetry_establishment/app/services/base64/encode_decode_base64.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
@@ -162,6 +163,7 @@ http.StreamedResponse response = await request.send();
 
 print("Request ::: ${responseData.body}");
 if (response.statusCode == 200 || response.statusCode == 201) {
+  DataRefresh.notifyChanged(); // MultipartRequest bypasses Api, so notify list screens here.
   print("Uploded");
 print(await response.stream.bytesToString());
 }

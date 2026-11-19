@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -33,7 +34,16 @@ class CompanyIdentity extends StatefulWidget {
 }
 
 
-class _CompanyIdentityState extends State<CompanyIdentity> {
+class _CompanyIdentityState extends State<CompanyIdentity>
+    with AutoRefreshMixin<CompanyIdentity> {
+  // build() does the first load via `_officeListFuture ??=`; the mixin only
+  // re-fetches when data changes anywhere in the app.
+  @override
+  bool get autoLoadOnOpen => false;
+
+  @override
+  Future<void> refreshData() async => _refreshOfficeList();
+
   TextEditingController nameController = TextEditingController();
   TextEditingController addressController = TextEditingController();
   TextEditingController emailController = TextEditingController();
@@ -42,8 +52,17 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
   TextEditingController OptionalController = TextEditingController();
   TextEditingController stateNameController = TextEditingController();
   TextEditingController countryNameController = TextEditingController();
-  late StreamController<List<CompanyIdentityModel>> _companyIdentityController;
+  /// Cached office-list request. Created once and only re-created by
+  /// [_refreshOfficeList], so rebuilds don't fire new API calls.
+  Future<List<CompanyIdentityModel>>? _officeListFuture;
   final PageController _pageController = PageController();
+
+  void _refreshOfficeList() {
+    if (!mounted) return;
+    setState(() {
+      _officeListFuture = companyOfficeListGet(context, 1, 30);
+    });
+  }
   final _formKey = GlobalKey<FormState>();
   bool showStreamBuilder = true;
   bool showManageScreen = false;
@@ -138,7 +157,7 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
   List<ServiceList> selectedServices = [];
   @override
   Widget build(BuildContext context) {
-    _companyIdentityController = StreamController<List<CompanyIdentityModel>>();
+    _officeListFuture ??= companyOfficeListGet(context, 1, 30);
     return LayoutBuilder(builder: (context, constraints) {
       const double minContentWidth = 1200;
       final double contentWidth = constraints.maxWidth > minContentWidth
@@ -239,7 +258,7 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
                           // },
                         // );
                       },
-                    );
+                    ).then((_) => _refreshOfficeList());
                   },
                   icon: Icons.add,
                 ),
@@ -251,21 +270,23 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
         if (!showManageScreen && !showWhitelabellingScreen)
           Expanded(
             child: showStreamBuilder
-                ? FutureBuilder(
-                future: companyOfficeListGet(context, 1, 30),
-                builder: (context, snap) {
-                  if (snap.hasData) {
-                    _companyIdentityController.add(snap.data!);
-                    return StreamBuilder<List<CompanyIdentityModel>>(
-                      stream: _companyIdentityController.stream,
-                      builder: (BuildContext context, snapshot) {
-                        companyOfficeListGet(context, 1, 30).then((data) {
-                          _companyIdentityController.add(data);
-                        }).catchError((error) {});
-                        if (snapshot.connectionState == ConnectionState.waiting) {
+                ? FutureBuilder<List<CompanyIdentityModel>>(
+                future: _officeListFuture,
+                builder: (BuildContext context, snapshot) {
+                        // Keep showing the previous list while a refresh is in flight.
+                        if (!snapshot.hasData) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return Center(
+                                child: CircularProgressIndicator(
+                                    color: Colors.blue));
+                          }
                           return Center(
-                              child: CircularProgressIndicator(
-                                  color: Colors.blue));
+                            child: Text(
+                              ErrorMessageString.noOffice,
+                              style: AllNoDataAvailable.customTextStyle(
+                                  context),
+                            ),
+                          );
                         }
                         if (snapshot.data!.isEmpty) {
                           return Center(
@@ -604,13 +625,6 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
                           );
                         }
                         return const Scaffold();
-                      },
-                    );
-                  } else {
-                    return const Center(
-                        child:
-                        CircularProgressIndicator(color: Colors.blue));
-                  }
                 })
                 : PageView(
               controller: _pageController,
@@ -644,6 +658,8 @@ class _CompanyIdentityState extends State<CompanyIdentity> {
                     showManageScreen = false;
                     showStreamBuilder = true;
                   });
+                  // Office details may have been edited on the manage screen.
+                  _refreshOfficeList();
                 }
               },
               companyOfficeId: selectedCompOfficeId,

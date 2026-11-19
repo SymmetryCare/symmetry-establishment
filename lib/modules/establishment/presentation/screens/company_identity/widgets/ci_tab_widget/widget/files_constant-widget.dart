@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
@@ -32,9 +33,29 @@ class PoliciesProcedureList extends StatefulWidget {
   State<PoliciesProcedureList> createState() => _PoliciesProcedureListState();
 }
 
-class _PoliciesProcedureListState extends State<PoliciesProcedureList> {
+class _PoliciesProcedureListState extends State<PoliciesProcedureList>
+    with AutoRefreshMixin<PoliciesProcedureList> {
   final ScrollController _horizontalScrollController = ScrollController();
   int flexVal = 2;
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await widget.fetchDocuments(context);
+      if (mounted && !widget.controller.isClosed) widget.controller.add(data);
+    } catch (error) {
+      debugPrint('PoliciesProcedureList load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PoliciesProcedureList oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // fetchDocuments is a new closure on every parent build, so only the
+    // target controller is compared.
+    if (oldWidget.controller != widget.controller) refreshData();
+  }
 
   @override
   void dispose() {
@@ -51,11 +72,7 @@ class _PoliciesProcedureListState extends State<PoliciesProcedureList> {
       child: StreamBuilder<List<NewOrgDocument>>(
         stream: _controller.stream,
         builder: (context, snapshot) {
-          widget.fetchDocuments(context).then((data) {
-            _controller.add(data);
-          }).catchError((error) {
-            // Handle error
-          });
+          // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
 
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(

@@ -159,6 +159,9 @@ class ManageEmpDocWidget extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
+                    // Degree tab gets "Add Degree"; every other tab gets
+                    // "Add Doc Type".
+                    if (provider.selectedIndex == degreeTabIndex)
                     CustomIconButtonConst(
                       width: AppSize.s137,
                       height: AppSize.s30,
@@ -176,11 +179,8 @@ class ManageEmpDocWidget extends StatelessWidget {
                           ),
                         );
                       },
-                    ),
-                    SizedBox(
-                      width: AppSize.s20,
-                    ),
-                    if (provider.selectedIndex != degreeTabIndex)
+                    )
+                    else
                     CustomIconButtonConst(
                      width: AppSize.s137,
                       height: AppSize.s30,

@@ -6,6 +6,7 @@ import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
 import 'package:symmetry_establishment/app/services/session/app_session.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class Api {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -57,7 +58,39 @@ class Api {
           handler.next(options);
         },
 
+        // Any successful write means list screens may be stale: tell them to
+        // re-fetch once (see DataRefresh / AutoRefreshMixin).
+        onResponse: (response, handler) {
+          final req = response.requestOptions;
+          final isWrite = req.method.toUpperCase() != 'GET';
+          final ok = (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300;
+          final isAuth = _authExcludedPaths.any((p) => req.path.contains(p));
+          if (isWrite && ok && !isAuth) DataRefresh.notifyChanged();
+          handler.next(response);
+        },
+
         onError: (error, handler) async {
+          // Screens now load once instead of polling, so retry a GET that
+          // failed transiently (network/CORS hiccup, timeout, 5xx) before
+          // giving up. Writes are never retried; 4xx (incl. 401) fall through.
+          final req = error.requestOptions;
+          final status = error.response?.statusCode ?? 0;
+          final attempt = (req.extra['_getRetry'] as int?) ?? 0;
+          final transient = error.response == null || status >= 500;
+          if (req.method.toUpperCase() == 'GET' &&
+              transient &&
+              attempt < 2 &&
+              error.type != DioExceptionType.cancel &&
+              !_authExcludedPaths.any((p) => req.path.contains(p))) {
+            await Future.delayed(Duration(milliseconds: 700 * (attempt + 1)));
+            req.extra['_getRetry'] = attempt + 1;
+            try {
+              return handler.resolve(await _dio.fetch(req));
+            } catch (_) {
+              return handler.next(error);
+            }
+          }
+
           final response = error.response;
           if (response == null) return handler.next(error);
 

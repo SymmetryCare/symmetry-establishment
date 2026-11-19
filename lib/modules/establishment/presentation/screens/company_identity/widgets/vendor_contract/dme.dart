@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -37,7 +38,37 @@ class CiDme extends StatefulWidget {
   State<CiDme> createState() => _CiDmeState();
 }
 
-class _CiDmeState extends State<CiDme> {
+class _CiDmeState extends State<CiDme> with AutoRefreshMixin<CiDme> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.vendorContracts,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId8DME,
+          1,
+          9999);
+      if (mounted && !vendorDMEController.isClosed) vendorDMEController.add(data);
+    } catch (error) {
+      debugPrint('DME load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiDme oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    vendorDMEController.close();
+    _identityDataController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -99,19 +130,7 @@ class _CiDmeState extends State<CiDme> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                 stream: vendorDMEController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(
-                          context,
-                          FrontendConfigStore.data!.config.vendorContracts, widget.officeId,
-                          // AppConfig.vendorContracts, widget.officeId,
-                            FrontendConfigStore.data!.config.subDocId8DME,
-                          // AppConfig.subDocId8DME,
-                          1,
-                          9999)
-                      .then((data) {
-                    vendorDMEController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
 
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {

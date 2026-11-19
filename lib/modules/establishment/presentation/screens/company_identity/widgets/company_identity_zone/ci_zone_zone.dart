@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/zone_manager.dart';
@@ -28,7 +29,7 @@ class CIZoneZone extends StatefulWidget {
   State<CIZoneZone> createState() => _CIZoneZoneState();
 }
 
-class _CIZoneZoneState extends State<CIZoneZone> {
+class _CIZoneZoneState extends State<CIZoneZone> with AutoRefreshMixin<CIZoneZone> {
   TextEditingController countynameController = TextEditingController();
   TextEditingController zipcodeController = TextEditingController();
   TextEditingController mapController = TextEditingController();
@@ -45,38 +46,39 @@ class _CIZoneZoneState extends State<CIZoneZone> {
       currentPage = pageNumber;
     });
   }
-  Timer? _fetchTimer;
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
     _zoneController = StreamController<List<AllCountyZoneGet>>.broadcast();
-    fetchCountyZone();
-    // Call every 3 seconds
-    _fetchTimer = Timer.periodic(Duration(seconds: 3), (timer) {
-      fetchCountyZone();
-    });
+    // Initial load + reloads on data change are done by AutoRefreshMixin (refreshData); no polling timer.
   }
   @override
   void didUpdateWidget(covariant CIZoneZone oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.countyId != widget.countyId) {
-      fetchCountyZone();
+    if (oldWidget.countyId != widget.countyId ||
+        oldWidget.officeId != widget.officeId) {
+      refreshData();
     }
   }
-  void fetchCountyZone() {
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() => fetchCountyZone();
+
+  Future<void> fetchCountyZone() async {
     if (widget.countyId != 0 ) {
-      getZoneByCounty(context, widget.officeId,widget.countyId, 1, 9999).then((data) {
-        _zoneController.add(data);
-      }).catchError((error) {
-        _zoneController.add([]);
+      try {
+        final data = await getZoneByCounty(context, widget.officeId,widget.countyId, 1, 9999);
+        if (mounted && !_zoneController.isClosed) _zoneController.add(data);
+      } catch (error) {
+        if (mounted && !_zoneController.isClosed) _zoneController.add([]);
         debugPrint("Error loading Zone: $error");
-      });
+      }
     }
   }
   @override
   void dispose() {
-    _fetchTimer?.cancel(); // avoid memory leaks
     _zoneController.close(); // also close stream
     super.dispose();
   }

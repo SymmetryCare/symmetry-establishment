@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -38,7 +39,37 @@ class CiMd extends StatefulWidget {
   State<CiMd> createState() => _CiMdState();
 }
 
-class _CiMdState extends State<CiMd> {
+class _CiMdState extends State<CiMd> with AutoRefreshMixin<CiMd> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.vendorContracts,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId9MD,
+          1,
+          9999);
+      if (mounted && !vendorMDController.isClosed) vendorMDController.add(data);
+    } catch (error) {
+      debugPrint('MD load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiMd oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    vendorMDController.close();
+    _identityDataController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -100,19 +131,7 @@ class _CiMdState extends State<CiMd> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                 stream: vendorMDController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(
-                          context,
-                           FrontendConfigStore.data!.config.vendorContracts, widget.officeId,
-                          // AppConfig.vendorContracts, widget.officeId,
-                           FrontendConfigStore.data!.config.subDocId9MD,
-                          // AppConfig.subDocId9MD,
-                          1,
-                          9999)
-                      .then((data) {
-                    vendorMDController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(

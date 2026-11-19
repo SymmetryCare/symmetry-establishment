@@ -18,6 +18,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/upload_edit_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/download_doc_get_api/download_doc_get_api.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class CICCLicense extends StatefulWidget {
   final int docId;
@@ -33,7 +34,36 @@ class CICCLicense extends StatefulWidget {
   State<CICCLicense> createState() => _CICCLicenseState();
 }
 
-class _CICCLicenseState extends State<CICCLicense> {
+class _CICCLicenseState extends State<CICCLicense> with AutoRefreshMixin<CICCLicense> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.corporateAndCompliance,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId1Licenses,
+          1,
+          9999);
+      if (mounted && !lisenceController.isClosed) lisenceController.add(data);
+    } catch (error) {
+      debugPrint('Licence load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CICCLicense oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    lisenceController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -61,15 +91,8 @@ class _CICCLicenseState extends State<CICCLicense> {
 
   @override
   void initState() {
-    getListMCorporateCompliancefetch(context, FrontendConfigStore.data!.config.corporateAndCompliance, widget.officeId,
-    // getListMCorporateCompliancefetch(context, AppConfig.corporateAndCompliance, widget.officeId,
-        FrontendConfigStore.data!.config.subDocId1Licenses, 1, 9999)
-            // AppConfig.subDocId1Licenses, 1, 9999)
-        .then((data) {
-      lisenceController.add(data);
-    }).catchError((error) {
-      // Handle error
-    });
+    super.initState();
+    // Initial load is done by refreshData() (AutoRefreshMixin).
     print("prachi:::::: ${widget.officeId}");
   }
 
@@ -102,12 +125,7 @@ class _CICCLicenseState extends State<CICCLicense> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                 stream: lisenceController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(context, FrontendConfigStore.data!.config.corporateAndCompliance, widget.officeId, FrontendConfigStore.data!.config.subDocId1Licenses,
-                  // getListMCorporateCompliancefetch(context, AppConfig.corporateAndCompliance, widget.officeId, AppConfig.subDocId1Licenses,
-                      1, 9999)
-                      .then((data) {
-                    lisenceController.add(data);
-                  }).catchError((error) {});
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(

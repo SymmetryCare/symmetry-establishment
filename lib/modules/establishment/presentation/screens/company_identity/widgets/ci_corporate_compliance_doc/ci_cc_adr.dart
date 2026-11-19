@@ -19,6 +19,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/shared
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/upload_edit_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/download_doc_get_api/download_doc_get_api.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class CICCADR extends StatefulWidget {
   final int docId;
@@ -34,7 +35,36 @@ class CICCADR extends StatefulWidget {
   State<CICCADR> createState() => _CICCADRState();
 }
 
-class _CICCADRState extends State<CICCADR> {
+class _CICCADRState extends State<CICCADR> with AutoRefreshMixin<CICCADR> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.corporateAndCompliance,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId2Adr,
+          1,
+          9999);
+      if (mounted && !_ccAdrController.isClosed) _ccAdrController.add(data);
+    } catch (error) {
+      debugPrint('ADR load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CICCADR oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    _ccAdrController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -95,12 +125,7 @@ class _CICCADRState extends State<CICCADR> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                 stream: _ccAdrController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(context,FrontendConfigStore.data!.config.corporateAndCompliance, widget.officeId, FrontendConfigStore.data!.config.subDocId2Adr, 1, 9999).then((data) {
-                  // getListMCorporateCompliancefetch(context, AppConfig.corporateAndCompliance, widget.officeId, AppConfig.subDocId2Adr, 1, 9999).then((data) {
-                    _ccAdrController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
