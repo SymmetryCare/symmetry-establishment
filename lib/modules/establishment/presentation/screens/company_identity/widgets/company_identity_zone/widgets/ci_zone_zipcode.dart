@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -24,7 +25,7 @@ class CiZoneZipcode extends StatefulWidget {
   State<CiZoneZipcode> createState() => _CiZoneZipcodeState();
 }
 
-class _CiZoneZipcodeState extends State<CiZoneZipcode> {
+class _CiZoneZipcodeState extends State<CiZoneZipcode> with AutoRefreshMixin<CiZoneZipcode> {
   TextEditingController countynameController = TextEditingController();
   TextEditingController zipcodeController = TextEditingController();
   TextEditingController mapController = TextEditingController();
@@ -39,7 +40,6 @@ class _CiZoneZipcodeState extends State<CiZoneZipcode> {
   final int totalPages = 5;
   double? _latitude;
   double? _longitude;
-  Timer? _fetchTimer;
   void onPageNumberPressed(int pageNumber) {
     setState(() {
       currentPage = pageNumber;
@@ -50,28 +50,31 @@ class _CiZoneZipcodeState extends State<CiZoneZipcode> {
     // TODO: implement initState
     super.initState();
     _zipcodeController = StreamController<List<AllZipCodeGet>>.broadcast();
-    fetchZipcodes();
-    // Call every 3 seconds
-    _fetchTimer = Timer.periodic(Duration(seconds: 3), (timer) {
-      fetchZipcodes();
-    });
+    // Initial load + reloads on data change are done by AutoRefreshMixin (refreshData); no polling timer.
   }
   @override
   void didUpdateWidget(covariant CiZoneZipcode oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.countySortId != widget.countySortId ||
-        oldWidget.zoneSortId != widget.zoneSortId) {
-      fetchZipcodes();
+        oldWidget.zoneSortId != widget.zoneSortId ||
+        oldWidget.officeId != widget.officeId) {
+      refreshData();
     }
   }
-  void fetchZipcodes() {
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() => fetchZipcodes();
+
+  Future<void> fetchZipcodes() async {
     if (widget.countySortId != 0 && widget.zoneSortId != 0) {
-      getZipcodeSetup(context, widget.officeId,1,999, widget.countySortId.toString(), widget.zoneSortId.toString()).then((data) {
-        _zipcodeController.add(data);
-      }).catchError((error) {
-        _zipcodeController.add([]);
+      try {
+        final data = await getZipcodeSetup(context, widget.officeId,1,999, widget.countySortId.toString(), widget.zoneSortId.toString());
+        if (mounted && !_zipcodeController.isClosed) _zipcodeController.add(data);
+      } catch (error) {
+        if (mounted && !_zipcodeController.isClosed) _zipcodeController.add([]);
         debugPrint("Error loading zip codes: $error");
-      });
+      }
     }
   }
   LatLng _selectedLocation = LatLng(37.7749, -122.4194);
@@ -82,7 +85,6 @@ class _CiZoneZipcodeState extends State<CiZoneZipcode> {
   }
   @override
   void dispose() {
-    _fetchTimer?.cancel(); // avoid memory leaks
     _zipcodeController.close(); // also close stream
     super.dispose();
   }

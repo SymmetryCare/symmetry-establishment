@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -37,7 +38,37 @@ class CiLeasesAndServices extends StatefulWidget {
   State<CiLeasesAndServices> createState() => _CiLeasesAndServicesState();
 }
 
-class _CiLeasesAndServicesState extends State<CiLeasesAndServices> {
+class _CiLeasesAndServicesState extends State<CiLeasesAndServices> with AutoRefreshMixin<CiLeasesAndServices> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.vendorContracts,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId6Leases,
+          1,
+          9999);
+      if (mounted && !vendorLeasesController.isClosed) vendorLeasesController.add(data);
+    } catch (error) {
+      debugPrint('Leases load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiLeasesAndServices oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    vendorLeasesController.close();
+    _identityDataController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -68,17 +99,7 @@ class _CiLeasesAndServicesState extends State<CiLeasesAndServices> {
     });
   }
 
-  @override
-  void initState() {
-    getListMCorporateCompliancefetch(context, FrontendConfigStore.data!.config.vendorContracts, widget.officeId,
-    // getListMCorporateCompliancefetch(context, AppConfig.vendorContracts, widget.officeId,
-        FrontendConfigStore.data!.config.subDocId6Leases, 1, 9999)
-        .then((data) {
-      vendorLeasesController.add(data);
-    }).catchError((error) {
-      // Handle error
-    });
-  }
+  // Initial load is done by AutoRefreshMixin (refreshData).
 
   int docTypeId = 0;
   String? documentTypeName;
@@ -111,19 +132,7 @@ class _CiLeasesAndServicesState extends State<CiLeasesAndServices> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                  stream: vendorLeasesController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(
-                          context,
-                           FrontendConfigStore.data!.config.vendorContracts, widget.officeId,
-                          // AppConfig.vendorContracts, widget.officeId,
-                           FrontendConfigStore.data!.config.subDocId6Leases,
-                          // AppConfig.subDocId6Leases,
-                          1,
-                          9999)
-                      .then((data) {
-                    vendorLeasesController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -27,7 +28,8 @@ class CiVisitScreen extends StatefulWidget {
   State<CiVisitScreen> createState() => _CiVisitScreenState();
 }
 
-class _CiVisitScreenState extends State<CiVisitScreen> {
+class _CiVisitScreenState extends State<CiVisitScreen>
+    with AutoRefreshMixin<CiVisitScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
   String? selectedValue;
   TextEditingController docNamecontroller = TextEditingController();
@@ -42,16 +44,24 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
     super.initState();
     hrcontainerColors = List.generate(20, (index) => Color(0xffE8A87D));
     _loadColors();
-    getVisit(context, 1, 9999).then((data) {
-      _visitController.add(data);
-    }).catchError((error) {
+    // First load is done by AutoRefreshMixin (refreshData after first frame).
+  }
 
-    });
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getVisit(context, 1, 9999);
+      if (mounted && !_visitController.isClosed) _visitController.add(data);
+    } catch (error) {
+      debugPrint('Visit load error: $error');
+    }
   }
 
   @override
   void dispose() {
     _horizontalScrollController.dispose();
+    _visitController.close();
     super.dispose();
   }
   String? selectedServiceName;
@@ -151,11 +161,7 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
               stream: _visitController.stream,
               builder: (context, snapshot) {
                 print('1111111');
-                getVisit(context, 1, 9999).then((data) {
-                  _visitController.add(data);
-                }).catchError((error) {
-                  // Handle error
-                });
+                // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Padding(
                     padding: EdgeInsets.symmetric(vertical: AppPadding.p150),
@@ -357,11 +363,12 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                                                               highlightColor: Colors.transparent,
                                                               hoverColor: Colors.transparent,
                                                               onPressed: () {
+                                                                final prefillFuture = getVisitListPrefill(context, visitData.visitId);
                                                                 showDialog(
                                                                   context: context,
                                                                   builder: (BuildContext context) {
                                                                     return FutureBuilder<VisitListDataPrefill>(
-                                                                      future: getVisitListPrefill(context, visitData.visitId),
+                                                                      future: prefillFuture,
                                                                       builder: (context, snapshotPrefill) {
                                                                         if (snapshotPrefill.connectionState == ConnectionState.waiting) {
                                                                           return Center(
@@ -462,11 +469,7 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                                                                               });
                                                                               try {
                                                                                 await deleteVisit(context, snapshot.data![index].visitId);
-                                                                                getVisit(context, 1, 10).then((data) {
-                                                                                  _visitController.add(data);
-                                                                                }).catchError((error) {
-                                                                                  // Handle error
-                                                                                });
+                                                                                refreshData();
                                                                                 Navigator.pop(context);
                                                                                 showDialog(context: context, builder: (context) => DeleteSuccessPopup());
                                                                               } finally {

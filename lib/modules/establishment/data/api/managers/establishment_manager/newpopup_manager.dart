@@ -50,14 +50,23 @@ Future<List<MCorporateComplianceModal>> getListMCorporateCompliancefetch(
       for (var item in items) {
         itemsList.add(
           MCorporateComplianceModal(
-            idOfDocument: item['DocumentId'] ?? item['documentId'] ?? 0,
-            orgOfficeDocumentId: item['OrgOfficeDocumentId'] ??
-                item['orgOfficeDocumentId'] ??
-                0,
-            docName: item['DocumentName'] ?? item['docName'] ?? '',
-            fileName: item['FileName'] ?? item['fileName'] ?? '',
-            docurl: item['DocumentUrl'] ?? item['url'] ?? '',
-            doccreatedAt: '${item['CreatedAt'] ?? item['createdAt'] ?? ''}',
+            // API returns snake_case keys (doc_name, file_name, url, ...);
+            // the PascalCase names are kept only as fallbacks.
+            idOfDocument: _i(item['idOfDocument'] ??
+                item['DocumentId'] ??
+                item['documentId']),
+            orgOfficeDocumentId: _i(item['orgOfficeDocumentId'] ??
+                item['OrgOfficeDocumentId']),
+            docName: _s(item['doc_name'] ??
+                item['DocumentName'] ??
+                item['docName']),
+            fileName: _s(item['file_name'] ??
+                item['FileName'] ??
+                item['fileName']),
+            docurl: _s(item['url'] ?? item['DocumentUrl']),
+            doccreatedAt: _s(item['doc_created_at'] ??
+                item['CreatedAt'] ??
+                item['createdAt']),
             docHistory: (item['DocumentHistory'] ?? item['docHistory'] ?? [])
                 as List<dynamic>,
             success: true,
@@ -102,18 +111,29 @@ Future<MCorporateCompliancePreFillModal> getPrefillNewOrgOfficeDocument(
           ? (response.data as List).first
           : response.data;
       return MCorporateCompliancePreFillModal(
-        idOfDocument: _s(item['DocumentId'] ?? item['documentId']),
-        orgOfficeDocumentId:
-            item['OrgOfficeDocumentId'] ?? orgOfficeDocumentId,
-        documentSetupId:
-            item['OrgDocumentSetupId'] ?? item['documentSetupId'] ?? 0,
-        docName: item['DocumentName'] ?? item['docName'] ?? '',
-        fileName: item['FileName'] ?? item['fileName'] ?? '',
-        url: item['DocumentUrl'] ?? item['url'] ?? '',
-        expType: item['ExpiryType'] ?? item['expType'] ?? '',
-        expiry_date: '${item['ExpiryDate'] ?? item['expiry_date'] ?? ''}',
-        threshould: _i(item['Threshold'] ?? item['threshould']),
-        isOthersDocs: item['IsOthersDocs'] ?? item['isOthersDocs'] ?? false,
+        // API returns snake_case keys; PascalCase kept only as fallbacks.
+        idOfDocument: _s(item['idOfDocument'] ??
+            item['DocumentId'] ??
+            item['documentId']),
+        orgOfficeDocumentId: item['orgOfficeDocumentId'] == null &&
+                item['OrgOfficeDocumentId'] == null
+            ? orgOfficeDocumentId
+            : _i(item['orgOfficeDocumentId'] ?? item['OrgOfficeDocumentId']),
+        documentSetupId: _i(item['orgDocumentSetupid'] ??
+            item['OrgDocumentSetupId'] ??
+            item['documentSetupId']),
+        docName: _s(item['doc_name'] ?? item['DocumentName'] ?? item['docName']),
+        fileName:
+            _s(item['file_name'] ?? item['FileName'] ?? item['fileName']),
+        url: _s(item['url'] ?? item['DocumentUrl']),
+        expType:
+            _s(item['expiry_type'] ?? item['ExpiryType'] ?? item['expType']),
+        expiry_date: _s(item['expiry_date'] ?? item['ExpiryDate'])
+            .replaceAll('Z', ''),
+        threshould: _i(item['threshold'] ??
+            item['Threshold'] ??
+            item['threshould']),
+        isOthersDocs: (item['isOthersDocs'] ?? item['IsOthersDocs']) == true,
         success: true,
         message: response.statusMessage ?? '',
       );
@@ -167,10 +187,18 @@ Future<List<TypeofDocpopup>> getTypeofDoc(
       final List items = data is List ? data : (data['data'] ?? []) as List;
       for (var item in items) {
         itemsList.add(TypeofDocpopup(
-          orgDocumentSetupid: _i(item['OrgDocumentSetupId']),
-          docname: _s(item['DocumentName'] ?? item['DocName']),
-          idOfDocument: _s(item['DocumentId'] ?? item['IdOfDocument']),
-          expirytype: _s(item['ExpiryType']),
+          // Same endpoint as the org-document setup tab (new_org_doc.dart),
+          // which returns snake_case keys. Reading only the PascalCase guesses
+          // left every name empty, so the "Type of the Document" rows were blank.
+          orgDocumentSetupid:
+              _i(item['orgDocumentSetupid'] ?? item['OrgDocumentSetupId']),
+          docname: _s(item['doc_name'] ??
+              item['DocumentName'] ??
+              item['DocName']),
+          idOfDocument: _s(item['idOfDocument'] ??
+              item['DocumentId'] ??
+              item['IdOfDocument']),
+          expirytype: _s(item['expiry_type'] ?? item['ExpiryType']),
           success: true,
           message: response.statusMessage ?? '',
         ));

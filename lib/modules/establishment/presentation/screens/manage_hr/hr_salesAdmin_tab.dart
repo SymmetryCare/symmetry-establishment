@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/hr_screen.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/widgets/edit_emp_popup_const.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
@@ -25,8 +26,26 @@ class HRSalesAdminTabScreens extends StatefulWidget {
   State<HRSalesAdminTabScreens> createState() => _HRSalesAdminTabScreensState();
 }
 
-class _HRSalesAdminTabScreensState extends State<HRSalesAdminTabScreens> {
+class _HRSalesAdminTabScreensState extends State<HRSalesAdminTabScreens> with AutoRefreshMixin<HRSalesAdminTabScreens> {
   final ScrollController _horizontalScrollController = ScrollController();
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final provider = Provider.of<HRTabScreenProvider>(context, listen: false);
+      final data = await getAllHrDeptWise(context, widget.deptId);
+      if (mounted && !provider.hrAllcontroller.isClosed) provider.hrAllcontroller.add(data);
+    } catch (error) {
+      debugPrint('HR dept-wise load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant HRSalesAdminTabScreens oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.deptId != widget.deptId) refreshData();
+  }
 
   @override
   void dispose() {
@@ -43,10 +62,7 @@ class _HRSalesAdminTabScreensState extends State<HRSalesAdminTabScreens> {
             child: StreamBuilder<List<HRAllData>>(
               stream: provider.hrAllcontroller.stream,
               builder: (context, snapshot) {
-                getAllHrDeptWise(context, widget.deptId).then((data) {
-                  provider.hrAllcontroller.add(data);
-                }).catchError((error) {});
-                print('1111111');
+                // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(
                     child: CircularProgressIndicator(color: ColorManager.blueprime),

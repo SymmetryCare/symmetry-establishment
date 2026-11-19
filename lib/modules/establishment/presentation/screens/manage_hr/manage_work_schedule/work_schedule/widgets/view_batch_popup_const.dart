@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/app/resources/font_manager.dart';
@@ -24,7 +25,7 @@ class ViewBatchesPopup extends StatefulWidget {
   State<ViewBatchesPopup> createState() => _ViewBatchesPopupState();
 }
 
-class _ViewBatchesPopupState extends State<ViewBatchesPopup> {
+class _ViewBatchesPopupState extends State<ViewBatchesPopup> with AutoRefreshMixin<ViewBatchesPopup> {
   int currentPage = 1;
   int itemsPerPage = 10;
   final StreamController<List<ShiftBachesData>>
@@ -33,14 +34,27 @@ class _ViewBatchesPopupState extends State<ViewBatchesPopup> {
   TextEditingController startTimeController = TextEditingController();
   TextEditingController endTimeController = TextEditingController();
   bool _isLoading = false;
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
   @override
-  void initState() {
-    super.initState();
-    shiftBatchesGet(context,widget.shiftName,widget.weekName).then((data) {
-      workWeekShiftBatchesController.add(data);
-    }).catchError((error) {
-      // Handle error
-    });
+  Future<void> refreshData() async {
+    try {
+      final data = await shiftBatchesGet(context, widget.shiftName, widget.weekName);
+      if (mounted && !workWeekShiftBatchesController.isClosed) workWeekShiftBatchesController.add(data);
+    } catch (error) {
+      debugPrint('Shift batches load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant ViewBatchesPopup oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.shiftName != widget.shiftName || oldWidget.weekName != widget.weekName) refreshData();
+  }
+
+  @override
+  void dispose() {
+    workWeekShiftBatchesController.close();
+    super.dispose();
   }
   @override
   Widget build(BuildContext context) {
@@ -91,11 +105,7 @@ class _ViewBatchesPopupState extends State<ViewBatchesPopup> {
                   StreamBuilder<List<ShiftBachesData>>(
                       stream: workWeekShiftBatchesController.stream,
                       builder: (context, snapshot) {
-                        shiftBatchesGet(context,widget.shiftName,widget.weekName).then((data) {
-                          workWeekShiftBatchesController.add(data);
-                        }).catchError((error) {
-                          // Handle error
-                        });
+                        // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                         if(snapshot.connectionState == ConnectionState.waiting){
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 150),
@@ -267,7 +277,7 @@ class _ViewBatchesPopupState extends State<ViewBatchesPopup> {
                                                                                         endTime == endTimeController.text ? endTime.toString() : endTimeController.text,
                                                                                         snapshot.data![index].shiftBatchScheduleId);
                                                                                     shiftBatchesGet(context,widget.shiftName,widget.weekName).then((data) {
-                                                                                      workWeekShiftBatchesController.add(data);
+                                                                                      if (!workWeekShiftBatchesController.isClosed) workWeekShiftBatchesController.add(data);
                                                                                     }).catchError((error) {
                                                                                       // Handle error
                                                                                     });

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter/material.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -22,7 +23,7 @@ class CIZoneCountry extends StatefulWidget {
   State<CIZoneCountry> createState() => _CIZoneCountryState();
 }
 
-class _CIZoneCountryState extends State<CIZoneCountry> {
+class _CIZoneCountryState extends State<CIZoneCountry> with AutoRefreshMixin<CIZoneCountry> {
   TextEditingController countynameController = TextEditingController();
   TextEditingController zipcodeController = TextEditingController();
   TextEditingController mapController = TextEditingController();
@@ -34,6 +35,30 @@ class _CIZoneCountryState extends State<CIZoneCountry> {
   @override
   void initState() {
     super.initState();
+  }
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getZoneBYcompOffice(context, widget.officeId, 1, 50);
+      data.sort((a, b) => b.countyId.compareTo(a.countyId)); // Assuming countyId for sorting
+      if (mounted && !_contyController.isClosed) _contyController.add(data);
+    } catch (error) {
+      debugPrint('County load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CIZoneCountry oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    _contyController.close();
+    super.dispose();
   }
 
   int currentPage = 1;
@@ -106,10 +131,7 @@ class _CIZoneCountryState extends State<CIZoneCountry> {
             StreamBuilder<List<AllCountyGet>>(
               stream: _contyController.stream,
               builder: (context, snapshot) {
-                getZoneBYcompOffice(context, widget.officeId, 1, 50).then((data) {
-                  data.sort((a, b) => b.countyId.compareTo(a.countyId)); // Assuming countyId for sorting
-                  _contyController.add(data);
-                }).catchError((error) {});
+                // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                 print('1111111');
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Center(
@@ -252,10 +274,8 @@ class _CIZoneCountryState extends State<CIZoneCountry> {
                                                                         builder: (BuildContext context) => FailedPopup(text: response.message),
                                                                       );
                                                                     }
-                                                                    getZoneBYcompOffice(context, widget.officeId, 1, 20).then((data){
-                                                                      data.sort((a, b) => b.countyId.compareTo(a.countyId));
-                                                                      _contyController.add(data);
-                                                                    }).catchError((error){});
+                                                                    // Reload the same list (same page size as the initial load).
+                                                                    refreshData();
 
                                                                   },
                                                                   title: 'Edit County',

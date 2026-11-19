@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:symmetry_establishment/app/constants/app_config.dart';
 import 'package:symmetry_establishment/app/resources/color.dart';
@@ -40,7 +41,38 @@ class CiPoliciesAndProcedures extends StatefulWidget {
   State<CiPoliciesAndProcedures> createState() =>
       _CiPoliciesAndProceduresState();
 }
-class _CiPoliciesAndProceduresState extends State<CiPoliciesAndProcedures> {
+class _CiPoliciesAndProceduresState extends State<CiPoliciesAndProcedures>
+    with AutoRefreshMixin<CiPoliciesAndProcedures> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.policiesAndProcedure,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId0,
+          1,
+          9999);
+      if (mounted && !_controller.isClosed) _controller.add(data);
+    } catch (error) {
+      debugPrint('Policies & procedures load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiPoliciesAndProcedures oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    _controller.close();
+    _identityDataController.close();
+    super.dispose();
+  }
+
   TextEditingController nameOfDocController = TextEditingController();
   TextEditingController idOfDocController = TextEditingController();
   TextEditingController docNamecontroller = TextEditingController();
@@ -113,12 +145,13 @@ class _CiPoliciesAndProceduresState extends State<CiPoliciesAndProcedures> {
                         docIdController.clear();
                         docNamecontroller.clear();
                         selectedExpiryType = "";
+                        final typeOfDocFuture = getTypeofDoc(context, docTypeMetaIdPP, selectedSubDocId);
 
                         showDialog(
                             context: context,
                             builder: (context) {
                               return FutureBuilder<List<TypeofDocpopup>>(
-                                  future: getTypeofDoc(context, docTypeMetaIdPP, selectedSubDocId),
+                                  future: typeOfDocFuture,
                                   builder: (contex, snapshot) {
                                     if (snapshot.connectionState ==
                                         ConnectionState.waiting) {
@@ -152,19 +185,7 @@ class _CiPoliciesAndProceduresState extends State<CiPoliciesAndProcedures> {
               child: StreamBuilder<List<MCorporateComplianceModal>>(
                   stream: _controller.stream,
                   builder: (context, snapshot) {
-                    getListMCorporateCompliancefetch(
-                            context,
-                             FrontendConfigStore.data!.config.policiesAndProcedure, widget.officeId,
-                            // AppConfig.policiesAndProcedure, widget.officeId,
-                              FrontendConfigStore.data!.config.subDocId0,
-                            // AppConfig.subDocId0,
-                            1,
-                            9999)
-                        .then((data) {
-                      _controller.add(data);
-                    }).catchError((error) {
-                      // Handle error
-                    });
+                    // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
 
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(
@@ -361,15 +382,16 @@ class _CiPoliciesAndProceduresState extends State<CiPoliciesAndProcedures> {
                                                           String?
                                                               selectedExpiryType =
                                                               expiryType;
+                                                          final prefillFuture = getPrefillNewOrgOfficeDocument(
+                                                              context,
+                                                              policiesdata
+                                                                  .orgOfficeDocumentId);
                                                           showDialog(
                                                             context: context,
                                                             builder: (context) {
                                                               return FutureBuilder<
                                                                   MCorporateCompliancePreFillModal>(
-                                                                future: getPrefillNewOrgOfficeDocument(
-                                                                    context,
-                                                                    policiesdata
-                                                                        .orgOfficeDocumentId),
+                                                                future: prefillFuture,
                                                                 builder: (context,
                                                                     snapshotPrefill) {
                                                                   if (snapshotPrefill

@@ -6,6 +6,7 @@ import 'package:symmetry_establishment/app/services/token/token_manager.dart';
 import 'package:symmetry_establishment/presentation/screens/login_module/login/login_screen.dart';
 import 'package:symmetry_establishment/app/services/shell/shell_link.dart';
 import 'package:symmetry_establishment/app/services/session/app_session.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class Api {
   // ── Singleton ─────────────────────────────────────────────────────────────
@@ -55,6 +56,17 @@ class Api {
           };
           print('REQUEST => ${options.method} ${options.uri}');
           handler.next(options);
+        },
+
+        // Any successful write means list screens may be stale: tell them to
+        // re-fetch once (see DataRefresh / AutoRefreshMixin).
+        onResponse: (response, handler) {
+          final req = response.requestOptions;
+          final isWrite = req.method.toUpperCase() != 'GET';
+          final ok = (response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 300;
+          final isAuth = _authExcludedPaths.any((p) => req.path.contains(p));
+          if (isWrite && ok && !isAuth) DataRefresh.notifyChanged();
+          handler.next(response);
         },
 
         onError: (error, handler) async {

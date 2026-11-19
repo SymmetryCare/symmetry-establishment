@@ -19,6 +19,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/upload_edit_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/download_doc_get_api/download_doc_get_api.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class CICCQuarterlyBalReport extends StatefulWidget {
   final int docId;
@@ -34,7 +35,36 @@ class CICCQuarterlyBalReport extends StatefulWidget {
   State<CICCQuarterlyBalReport> createState() => _CICCQuarterlyBalReportState();
 }
 
-class _CICCQuarterlyBalReportState extends State<CICCQuarterlyBalReport> {
+class _CICCQuarterlyBalReportState extends State<CICCQuarterlyBalReport> with AutoRefreshMixin<CICCQuarterlyBalReport> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.corporateAndCompliance,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId5BalReport,
+          1,
+          9999);
+      if (mounted && !_ccQuarterlyController.isClosed) _ccQuarterlyController.add(data);
+    } catch (error) {
+      debugPrint('Quarterly balance report load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CICCQuarterlyBalReport oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    _ccQuarterlyController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -95,19 +125,7 @@ class _CICCQuarterlyBalReportState extends State<CICCQuarterlyBalReport> {
             child: StreamBuilder<List<MCorporateComplianceModal>>(
                 stream: _ccQuarterlyController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(
-                          context,
-                           FrontendConfigStore.data!.config.corporateAndCompliance, widget.officeId,
-                          // AppConfig.corporateAndCompliance, widget.officeId,
-                          FrontendConfigStore.data!.config.subDocId5BalReport,
-                          // AppConfig.subDocId5BalReport,
-                          1,
-                          9999)
-                      .then((data) {
-                    _ccQuarterlyController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(

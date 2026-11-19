@@ -11,6 +11,7 @@ import 'package:symmetry_establishment/modules/establishment/presentation/screen
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
 import 'package:provider/provider.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/work_schedule/work_week_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/delete_success_popup.dart';
@@ -88,7 +89,7 @@ class DefineHolidays extends StatefulWidget {
   State<DefineHolidays> createState() => _DefineHolidaysState();
 }
 
-class _DefineHolidaysState extends State<DefineHolidays> {
+class _DefineHolidaysState extends State<DefineHolidays> with AutoRefreshMixin<DefineHolidays> {
   final ScrollController _horizontalScrollController = ScrollController();
   final TextEditingController holidayNameController = TextEditingController();
   final TextEditingController calenderController = TextEditingController();
@@ -98,9 +99,21 @@ class _DefineHolidaysState extends State<DefineHolidays> {
   int _currentPage = 1;
   final int _itemsPerPage = 10;
 
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await holidaysListGet(context);
+      if (mounted && !streamHolidayDataController.isClosed) streamHolidayDataController.add(data);
+    } catch (error) {
+      debugPrint('Holidays load error: $error');
+    }
+  }
+
   @override
   void dispose() {
     _horizontalScrollController.dispose();
+    streamHolidayDataController.close();
     super.dispose();
   }
 
@@ -198,9 +211,7 @@ class _DefineHolidaysState extends State<DefineHolidays> {
                 child: StreamBuilder<List<DefineHolidayData>>(
                   stream: streamHolidayDataController.stream,
                   builder: (context, snapshot) {
-                    holidaysListGet(context).then((data) {
-                      streamHolidayDataController.add(data);
-                    }).catchError((error) {});
+                    // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
 
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return Center(

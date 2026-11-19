@@ -9,6 +9,7 @@ import 'package:symmetry_establishment/app/resources/font_manager.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/user.dart';
 import 'package:symmetry_establishment/app/services/token/token_manager.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/company_identity/company_identity_data_.dart';
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/user/user_modal.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
@@ -31,7 +32,16 @@ class SeeAllScreen extends StatefulWidget {
   State<SeeAllScreen> createState() => _SeeAllScreenState();
 }
 
-class _SeeAllScreenState extends State<SeeAllScreen> {
+class _SeeAllScreenState extends State<SeeAllScreen>
+    with AutoRefreshMixin<SeeAllScreen> {
+  // initState already calls _loadUsers(); the mixin only re-fetches when
+  // data changes anywhere in the app.
+  @override
+  bool get autoLoadOnOpen => false;
+
+  @override
+  Future<void> refreshData() => _loadUsers();
+
   final StreamController<List<CompanyModel>> _controller =
   StreamController<List<CompanyModel>>();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
@@ -97,11 +107,7 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
   void initState() {
     super.initState();
     isUserLoggedIn();
-    getUser(context, '').then((data) {
-      _companyUsersList.add(data);
-    }).catchError((error) {
-      // Handle error
-    });
+    _loadUsers();
     userIdController.addListener(_checkFields);
     firstNameController.addListener(_checkFields);
     lastNameController.addListener(_checkFields);
@@ -164,6 +170,25 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
   List<UserModal> _latestUsers = [];
   int _latestTotalPages = 1;
 
+  /// Fetches the users once and pushes them to the list + pagination.
+  /// Call this whenever the list may have changed (add/edit/delete/status).
+  Future<void> _loadUsers() async {
+    try {
+      final data = await getUser(context, '');
+      if (!mounted) return;
+      data.sort((a, b) => b.userId.compareTo(a.userId));
+      final pages = (data.length / itemsPerPage).ceil();
+      setState(() {
+        _latestUsers = data;
+        _latestTotalPages = pages < 1 ? 1 : pages;
+        if (currentPage > _latestTotalPages) currentPage = _latestTotalPages;
+      });
+      _companyUsersList.add(data);
+    } catch (e) {
+      print('Error loading users: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -220,7 +245,7 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
                               passwordController: passwordController,
                             );
                           },
-                        );
+                        ).then((_) => _loadUsers());
                       },
                     ),
                   ),
@@ -322,9 +347,8 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
               child: StreamBuilder<List<UserModal>>(
                 stream: _companyUsersList.stream,
                 builder: (BuildContext context, snapshot) {
-                  getUser(context, '').then((data) {
-                    _companyUsersList.add(data);
-                  }).catchError((error) {});
+                  // Data is fetched by _loadUsers(); don't call the API here,
+                  // or every new value triggers another request (endless loop).
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(
@@ -352,8 +376,6 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
                         .skip((currentPage - 1) * itemsPerPage)
                         .take(itemsPerPage)
                         .toList();
-                    _latestUsers = snapshot.data!;
-                    _latestTotalPages = totalPages;
                     return ListView.builder(
                             scrollDirection: Axis.vertical,
                             itemCount: paginatedData.length,
@@ -616,7 +638,7 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
                                                             },
                                                           );
                                                         },
-                                                      );
+                                                      ).then((_) => _loadUsers());
                                                     },
                                                   ),
                                                   SizedBox(width: AppSize.s10),
@@ -653,21 +675,9 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
                                                                     try {
                                                                       await deleteUser(context, user.userId);
 
-                                                                      final data = await getUser(context, '');
-
-                                                                      // Recalculate total pages with updated list
-                                                                      int newTotalPages = (data.length / itemsPerPage).ceil();
-
-                                                                      // Clamp currentPage to valid range
-                                                                      // so deleted last-page items shift view to last valid page
-                                                                      this.setState(
-                                                                              () {
-                                                                            if (currentPage > newTotalPages && newTotalPages > 0) {
-                                                                              currentPage = newTotalPages;
-                                                                            }
-                                                                          });
-
-                                                                      _companyUsersList.add(data);
+                                                                      // Reloads the list, recalculates pages and
+                                                                      // clamps currentPage so it never shows an empty page.
+                                                                      await _loadUsers();
 
                                                                       Navigator.pop(context);
                                                                       showDialog(context: context, builder: (context) => DeleteSuccessPopup(),
@@ -741,11 +751,7 @@ class _SeeAllScreenState extends State<SeeAllScreen> {
                                                                 );
                                                                 if (response
                                                                     .success) {
-                                                                  final updatedUsers =
-                                                                  await getUser(context, '');
-                                                                  _companyUsersList
-                                                                      .add(
-                                                                      updatedUsers);
+                                                                  await _loadUsers();
                                                                 }
                                                               } catch (e) {
                                                                 print(

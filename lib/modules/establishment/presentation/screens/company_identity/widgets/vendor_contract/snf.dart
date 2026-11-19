@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -37,7 +38,37 @@ class CiSnf extends StatefulWidget {
   State<CiSnf> createState() => _CiSnfState();
 }
 
-class _CiSnfState extends State<CiSnf> {
+class _CiSnfState extends State<CiSnf> with AutoRefreshMixin<CiSnf> {
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getListMCorporateCompliancefetch(
+          context,
+          FrontendConfigStore.data!.config.vendorContracts,
+          widget.officeId,
+          FrontendConfigStore.data!.config.subDocId7SNF,
+          1,
+          9999);
+      if (mounted && !vendorSnfController.isClosed) vendorSnfController.add(data);
+    } catch (error) {
+      debugPrint('SNF load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiSnf oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    vendorSnfController.close();
+    _identityDataController.close();
+    super.dispose();
+  }
+
   TextEditingController docNameController = TextEditingController();
   TextEditingController docIdController = TextEditingController();
   TextEditingController calenderController = TextEditingController();
@@ -99,19 +130,7 @@ class _CiSnfState extends State<CiSnf> {
 
                 stream: vendorSnfController.stream,
                 builder: (context, snapshot) {
-                  getListMCorporateCompliancefetch(
-                          context,
-                          FrontendConfigStore.data!.config.vendorContracts, widget.officeId,
-                          // AppConfig.vendorContracts, widget.officeId,
-                          FrontendConfigStore.data!.config.subDocId7SNF,
-                          // AppConfig.subDocId7SNF,
-                          1,
-                          9999)
-                      .then((data) {
-                    vendorSnfController.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   print('55555555');
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(

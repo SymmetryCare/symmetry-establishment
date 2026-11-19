@@ -12,6 +12,7 @@ import 'package:symmetry_establishment/modules/establishment/data/api/managers/e
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/delete_success_popup.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/pagination_widget.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 
 class CiInsuranceVendor extends StatefulWidget {
   final String officeId;
@@ -21,7 +22,7 @@ class CiInsuranceVendor extends StatefulWidget {
   State<CiInsuranceVendor> createState() => _CiInsuranceVendorState();
 }
 
-class _CiInsuranceVendorState extends State<CiInsuranceVendor> {
+class _CiInsuranceVendorState extends State<CiInsuranceVendor> with AutoRefreshMixin<CiInsuranceVendor> {
   //TextEditingController vendorNameController = TextEditingController();
   TextEditingController nameController = TextEditingController();
   TextEditingController addresscontroller = TextEditingController();
@@ -36,6 +37,29 @@ class _CiInsuranceVendorState extends State<CiInsuranceVendor> {
   void initState() {
     super.initState();
     // companyAllApi(context);
+  }
+
+  /// Loads once on open and again whenever data changes (AutoRefreshMixin).
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await companyVendorGet(context, widget.officeId, 1, 9999);
+      if (mounted && !_companyVendor.isClosed) _companyVendor.add(data);
+    } catch (error) {
+      debugPrint('Insurance vendor load error: $error');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant CiInsuranceVendor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.officeId != widget.officeId) refreshData();
+  }
+
+  @override
+  void dispose() {
+    _companyVendor.close();
+    super.dispose();
   }
   String? selectedZoneName;
   String? selectedCityName;
@@ -93,11 +117,7 @@ class _CiInsuranceVendorState extends State<CiInsuranceVendor> {
             child: StreamBuilder<List<ManageVendorData>>(
                 stream: _companyVendor.stream,
                 builder: (context, snapshot) {
-                  companyVendorGet(context,widget.officeId,1,9999).then((data) {
-                    _companyVendor.add(data);
-                  }).catchError((error) {
-                    // Handle error
-                  });
+                  // Data comes from refreshData() (AutoRefreshMixin); no API calls here.
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return Center(
                       child: CircularProgressIndicator(
