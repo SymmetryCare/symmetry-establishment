@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:symmetry_establishment/app/resources/common_resources/common_theme_const.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establish_theme_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
@@ -27,7 +28,8 @@ class CiVisitScreen extends StatefulWidget {
   State<CiVisitScreen> createState() => _CiVisitScreenState();
 }
 
-class _CiVisitScreenState extends State<CiVisitScreen> {
+class _CiVisitScreenState extends State<CiVisitScreen>
+    with AutoRefreshMixin<CiVisitScreen> {
   final ScrollController _horizontalScrollController = ScrollController();
   String? selectedValue;
   TextEditingController docNamecontroller = TextEditingController();
@@ -42,16 +44,25 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
     super.initState();
     hrcontainerColors = List.generate(20, (index) => Color(0xffE8A87D));
     _loadColors();
-    getVisit(context, 1, 9999).then((data) {
-      _visitController.add(data);
-    }).catchError((error) {
+    // First load is done by AutoRefreshMixin (refreshData after first frame).
+  }
 
-    });
+  /// Loads the whole list (the screen pages locally) once on open and again
+  /// whenever data changes (AutoRefreshMixin). Never call this from build.
+  @override
+  Future<void> refreshData() async {
+    try {
+      final data = await getVisit(context, 1, 9999);
+      if (mounted && !_visitController.isClosed) _visitController.add(data);
+    } catch (error) {
+      debugPrint('Visit load error: $error');
+    }
   }
 
   @override
   void dispose() {
     _horizontalScrollController.dispose();
+    _visitController.close();
     super.dispose();
   }
   String? selectedServiceName;
@@ -150,12 +161,8 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
           child: StreamBuilder<List<CiVisit>>(
               stream: _visitController.stream,
               builder: (context, snapshot) {
-                print('1111111');
-                getVisit(context, 1, 9999).then((data) {
-                  _visitController.add(data);
-                }).catchError((error) {
-                  // Handle error
-                });
+                // Data comes from refreshData() (AutoRefreshMixin); no API calls
+                // here, or every new value triggers another request (endless loop).
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return Padding(
                     padding: EdgeInsets.symmetric(vertical: AppPadding.p150),
@@ -469,11 +476,7 @@ class _CiVisitScreenState extends State<CiVisitScreen> {
                                                                                 await deleteVisit(context, visitData.visitId);
                                                                                 // The whole list, as the screen loads it
                                                                                 // (it pages locally); 10 lost the rest.
-                                                                                getVisit(context, 1, 9999).then((data) {
-                                                                                  _visitController.add(data);
-                                                                                }).catchError((error) {
-                                                                                  // Handle error
-                                                                                });
+                                                                                refreshData();
                                                                                 Navigator.pop(context);
                                                                                 showDialog(context: context, builder: (context) => DeleteSuccessPopup());
                                                                               } finally {
