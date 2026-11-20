@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 
 import 'package:symmetry_establishment/app/services/api/api.dart';
@@ -8,22 +9,42 @@ import 'package:symmetry_establishment/modules/establishment/data/models/establi
 
 /// Company Identity → Insurance: vendors and their contracts.
 ///
-/// Reconstructed from the call sites in
-/// `.../company_identity/widgets/ci_insurance`; the original lived in the
-/// `prohealth` monolith and did not come across with the extracted screens.
-/// The models ([ManageVendorData] and friends) did come across with HR, so only
-/// the calls are rebuilt here, against the endpoints in
-/// [EstablishmentManagerRepository].
+/// Reconstructed from the call sites when the screens were extracted, with
+/// guessed PascalCase keys ("CompanyId", "VendorName"). The backend's
+/// /insurance-vendor and /insurance-vendor-contract take and return the
+/// columns as they are named in the database (vendorName, officeId,
+/// expiry_type, ...), so Add Vendor failed with a 500 and the lists came back
+/// empty. The keys below are those columns, as in the original EMR manager.
 
 String _s(dynamic v) => v == null ? '' : '$v';
 int _i(dynamic v) => v is int ? v : int.tryParse('$v') ?? 0;
 
-ApiData _result(dynamic response) => ApiData(
-      success: response.statusCode == 200 || response.statusCode == 201,
-      message: response.statusMessage ?? '',
-      statusCode: response.statusCode ?? 0,
-      data: response.data,
-    );
+ApiData _result(dynamic response) {
+  final ok = response.statusCode == 200 || response.statusCode == 201;
+  final body = response.data;
+  final serverMessage = body is Map ? body['message'] : null;
+  return ApiData(
+    success: ok,
+    message: ok
+        ? (response.statusMessage ?? '')
+        : serverMessage is List
+            ? serverMessage.join('\n')
+            : '${serverMessage ?? response.statusMessage ?? 'Request failed'}',
+    statusCode: response.statusCode ?? 0,
+    data: body,
+  );
+}
+
+/// A failed call as the dialog should show it: the server's own message
+/// (e.g. "vendorName must be a string"), not Dio's paragraph about status
+/// codes.
+ApiData _failure(Object e) {
+  if (e is DioException && e.response != null) return _result(e.response);
+  return ApiData(
+      success: false,
+      message: 'Could not reach the server. Please try again.',
+      statusCode: 0);
+}
 
 // ── vendors ────────────────────────────────────────────────────────────────
 
@@ -35,15 +56,15 @@ Future<ApiData> addVendors(
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.companyOfficeVendorPost(),
       data: {
-        "CompanyId": companyId,
-        "OfficeId": officeId,
-        "VendorName": vendorName,
+        "companyId": companyId,
+        "officeId": officeId,
+        "vendorName": vendorName,
       },
     );
     return _result(response);
   } catch (e) {
     print("addVendors error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
 
@@ -64,12 +85,12 @@ Future<List<ManageVendorData>> companyVendorGet(BuildContext context,
       final List items = data is List ? data : (data['data'] ?? []) as List;
       for (var item in items) {
         itemsList.add(ManageVendorData(
-          companyId: _i(item['CompanyId']),
-          insuranceVendorId: _i(item['InsuranceVendorId']),
-          officeId: _s(item['OfficeId']),
-          vendorName: _s(item['VendorName']),
-          address: _s(item['Address']),
-          phone: _s(item['Phone']),
+          companyId: _i(item['companyId'] ?? companyId),
+          insuranceVendorId: _i(item['insuranceVendorId']),
+          officeId: _s(item['officeId']),
+          vendorName: _s(item['vendorName']),
+          address: _s(item['vendorAddress']),
+          phone: _s(item['vendorPhone']),
           sucess: true,
           message: response.statusMessage ?? '',
         ));
@@ -93,16 +114,16 @@ Future<ManageVendorPrefill> getPrefillVendor(
       final item =
           response.data is List ? (response.data as List).first : response.data;
       return ManageVendorPrefill(
-        vendorId: _i(item['InsuranceVendorId']),
-        officeId: _s(item['OfficeId']),
-        vendorName: _s(item['VendorName']),
-        address: _s(item['Address']),
-        city: _s(item['City']),
-        email: _s(item['Email']),
-        phone: _s(item['Phone']),
-        workEmail: _s(item['WorkEmail']),
-        workPhone: _s(item['WorkPhone']),
-        zone: _s(item['Zone']),
+        vendorId: _i(item['insuranceVendorId']),
+        officeId: _s(item['officeId']),
+        vendorName: _s(item['vendorName']),
+        address: _s(item['vendorAddress']),
+        city: _s(item['city']),
+        email: _s(item['email']),
+        phone: _s(item['vendorPhone']),
+        workEmail: _s(item['work_email']),
+        workPhone: _s(item['work_phone']),
+        zone: _s(item['zone']),
       );
     }
     return ManageVendorPrefill(vendorId: insuranceVendorId);
@@ -116,15 +137,20 @@ Future<ManageVendorPrefill> getPrefillVendor(
 Future<ApiData> patchCompanyVendor(BuildContext context,
     int insuranceVendorId, String officeId, String vendorName) async {
   try {
+    final int companyId = await TokenManager.getCompanyId();
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.companyVendorPatchDelete(
           insuranceVendorId: insuranceVendorId),
-      data: {"OfficeId": officeId, "VendorName": vendorName},
+      data: {
+        "companyId": companyId,
+        "officeId": officeId,
+        "vendorName": vendorName,
+      },
     );
     return _result(response);
   } catch (e) {
     print("patchCompanyVendor error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
 
@@ -138,7 +164,7 @@ Future<ApiData> deleteVendor(
     return _result(response);
   } catch (e) {
     print("deleteVendor error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
 
@@ -160,20 +186,20 @@ Future<ApiData> addVendorContract(
     final response = await Api(context).post(
       path: EstablishmentManagerRepository.companyOfficeContractPost(),
       data: {
-        "CompanyId": companyId,
-        "OfficeId": officeId,
-        "InsuranceVendorId": insuranceVendorId,
-        "ContractName": contractName,
-        "ContractId": contractId,
-        "ExpiryType": expiryType,
-        "ExpiryDate": expiryDate,
-        "Threshold": threshold,
+        "companyId": companyId,
+        "officeId": officeId,
+        "insuranceVendorId": insuranceVendorId,
+        "contractName": contractName,
+        "contractId": contractId,
+        "expiry_type": expiryType,
+        "expiry_date": expiryDate,
+        "threshold": threshold,
       },
     );
     return _result(response);
   } catch (e) {
     print("addVendorContract error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
 
@@ -200,16 +226,16 @@ Future<List<ManageInsuranceContractData>> companyContractGetByVendorId(
       final List items = data is List ? data : (data['data'] ?? []) as List;
       for (var item in items) {
         itemsList.add(ManageInsuranceContractData(
-          insuranceVendorContracId: _i(item['InsuranceVendorContracId']),
-          insuranceVendorId: _i(item['InsuranceVendorId']),
-          contractName: _s(item['ContractName']),
-          contractId: _s(item['ContractId']),
-          expiryType: _s(item['ExpiryType']),
-          companyId: _i(item['CompanyId']),
-          officeId: _s(item['OfficeId']),
-          expiryDate: _s(item['ExpiryDate']),
-          expiryReminder: _s(item['ExpiryReminder']),
-          threshold: _i(item['Threshold']),
+          insuranceVendorContracId: _i(item['insuranceVendorContracId']),
+          insuranceVendorId: _i(item['insuranceVendorId']),
+          contractName: _s(item['contractName']),
+          contractId: _s(item['contractId']),
+          expiryType: _s(item['expiry_type']),
+          companyId: _i(item['companyId'] ?? companyId),
+          officeId: _s(item['officeId']),
+          expiryDate: _s(item['expiry_date']),
+          expiryReminder: _s(item['expiry_reminder']),
+          threshold: _i(item['threshold']),
           sucess: true,
           message: response.statusMessage ?? '',
         ));
@@ -240,16 +266,16 @@ Future<ManageContractPrefill> getPrefillContract(
       final item =
           response.data is List ? (response.data as List).first : response.data;
       return ManageContractPrefill(
-        insuranceVendorContracId: _i(item['InsuranceVendorContracId']),
-        insuranceVendorId: _i(item['InsuranceVendorId']),
-        companyId: _i(item['CompanyId']),
-        officeId: _s(item['OfficeId']),
-        contractName: _s(item['ContractName']),
-        contractId: _s(item['ContractId']),
-        expiryType: _s(item['ExpiryType']),
-        expiryDate: _s(item['ExpiryDate']),
-        expiryReminder: _s(item['ExpiryReminder']),
-        threshold: _i(item['Threshold']),
+        insuranceVendorContracId: _i(item['insuranceVendorContracId']),
+        insuranceVendorId: _i(item['insuranceVendorId']),
+        companyId: _i(item['companyId']),
+        officeId: _s(item['officeId']),
+        contractName: _s(item['contractName']),
+        contractId: _s(item['contractId']),
+        expiryType: _s(item['expiry_type']),
+        expiryDate: _s(item['expiry_date']),
+        expiryReminder: _s(item['expiry_reminder']),
+        threshold: _i(item['threshold']),
       );
     }
     return empty;
@@ -272,23 +298,25 @@ Future<ApiData> patchCompanyContract(
   String expiryDate,
 ) async {
   try {
+    final int companyId = await TokenManager.getCompanyId();
     final response = await Api(context).patch(
       path: EstablishmentManagerRepository.companyOfficeVendorPatchDelete(
           insuranceVendorContracId: insuranceVendorContracId),
       data: {
-        "InsuranceVendorId": insuranceVendorId,
-        "OfficeId": officeId,
-        "ContractName": contractName,
-        "ContractId": contractId,
-        "ExpiryType": expiryType,
-        "ExpiryDate": expiryDate,
-        "Threshold": threshold,
+        "companyId": companyId,
+        "insuranceVendorId": insuranceVendorId,
+        "officeId": officeId,
+        "contractName": contractName,
+        "contractId": contractId,
+        "expiry_type": expiryType,
+        "expiry_date": expiryDate,
+        "threshold": threshold,
       },
     );
     return _result(response);
   } catch (e) {
     print("patchCompanyContract error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
 
@@ -302,6 +330,6 @@ Future<ApiData> deleteContract(
     return _result(response);
   } catch (e) {
     print("deleteContract error $e");
-    return ApiData(success: false, message: '$e', statusCode: 0);
+    return _failure(e);
   }
 }
