@@ -91,6 +91,10 @@ class _CompanyIdentityState extends State<CompanyIdentity>
   double selectedOfficeLon = 0.0;
   int selectedCompId = 0;
   int selectedCompOfficeId = 0;
+  /// The office opened in the Manage screen (its Edit / Delete Office
+  /// buttons work on it).
+  CompanyIdentityModel? selectedOffice;
+  bool selectedIsHeadOffice = false;
   // bool _isSubmitting = false;
 
   void showManageScreenFunction(
@@ -155,6 +159,14 @@ class _CompanyIdentityState extends State<CompanyIdentity>
 
   String? generatedString;
   List<ServiceList> selectedServices = [];
+
+  /// The office's saved location; falls back to the list API's own default
+  /// so a malformed lat/long can't break the card.
+  LatLng _officeLatLng(CompanyIdentityModel office) => LatLng(
+        double.tryParse(office.lat) ?? 37.7749,
+        double.tryParse(office.long) ?? -122.4194,
+      );
+
   @override
   Widget build(BuildContext context) {
     _officeListFuture ??= companyOfficeListGet(context, 1, 30);
@@ -420,28 +432,23 @@ class _CompanyIdentityState extends State<CompanyIdentity>
                                                             Container(
                                                               height: AppSize.s181,
                                                               child: GoogleMap(
-
+                                                                // Keyed by office + location: initialCameraPosition
+                                                                // is only read once, so an edited lat/long needs a
+                                                                // fresh map to show the new spot.
+                                                                key: ValueKey(
+                                                                    '${paginatedData[index].companyOfficeId}-${paginatedData[index].lat}-${paginatedData[index].long}'),
+                                                                // This card's office: `index` counts cards on this
+                                                                // page, so snapshot.data![index] showed another
+                                                                // office's map from page 2 on.
                                                                 initialCameraPosition:
                                                                 CameraPosition(
-                                                                  target: LatLng(
-                                                                    double.parse(snapshot
-                                                                        .data![index].lat),
-                                                                    double.parse(snapshot
-                                                                        .data![index].long),
-                                                                  ),
+                                                                  target: _officeLatLng(paginatedData[index]),
                                                                   zoom: 15.0,
                                                                 ),
                                                                 markers: {
                                                                   Marker(
                                                                     markerId: MarkerId(''),
-                                                                    position: LatLng(
-                                                                      double.parse(snapshot
-                                                                          .data![index]
-                                                                          .lat),
-                                                                      double.parse(snapshot
-                                                                          .data![index]
-                                                                          .long),
-                                                                    ),
+                                                                    position: _officeLatLng(paginatedData[index]),
                                                                   ),
                                                                 },
                                                                 zoomControlsEnabled: false,
@@ -557,6 +564,10 @@ class _CompanyIdentityState extends State<CompanyIdentity>
                                                         text: AppStringEM.manage,
                                                             color:  ColorManager.blueprime,
                                                             onPressed: ()async {
+                                                              selectedOffice = paginatedData[index];
+                                                              // Same rule as the "Head Office" badge.
+                                                              selectedIsHeadOffice = isHeadOffice ||
+                                                                  paginatedData[index].isHeadOffice;
                                                               showManageScreenFunction(
                                                                 officeId:
                                                                 paginatedData[index]
@@ -576,8 +587,8 @@ class _CompanyIdentityState extends State<CompanyIdentity>
                                                                 countryName:
                                                                 paginatedData[index]
                                                                     .countryName,
-                                                                officeLat: double.parse(paginatedData[index].lat),
-                                                                officeLon: double.parse(paginatedData[index].long),
+                                                                officeLat: _officeLatLng(paginatedData[index]).latitude,
+                                                                officeLon: _officeLatLng(paginatedData[index]).longitude,
                                                               );
                                                             },
                                                           ),
@@ -648,6 +659,8 @@ class _CompanyIdentityState extends State<CompanyIdentity>
         if (showManageScreen)
           Expanded(
             child: ManageWidget(
+              office: selectedOffice!,
+              isHeadOffice: selectedIsHeadOffice,
               officeID: selectedOfficeID,
               officeName: selectedOfficeName,
               companyID: selectedCompId,

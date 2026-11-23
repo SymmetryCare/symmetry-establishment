@@ -320,6 +320,34 @@ Future<List<CompanyIdentityModel>> companyOfficeListGet(
 }
 
 
+/// Delete an office: DELETE /company-office/{company_Office_id}
+/// (the same path the office PATCH uses).
+Future<ApiData> deleteCompanyOffice(
+    BuildContext context, int companyOfficeId) async {
+  try {
+    final response = await Api(context).delete(
+        path: EstablishmentManagerRepository.companyOfficepatch(
+            company_Office_id: companyOfficeId));
+    if (response.statusCode == 200 ||
+        response.statusCode == 201 ||
+        response.statusCode == 204) {
+      return ApiData(
+          statusCode: response.statusCode!,
+          success: true,
+          message: response.statusMessage ?? '');
+    }
+    return ApiData(
+        statusCode: response.statusCode!,
+        success: false,
+        message: (response.data is Map ? response.data['message'] : null) ??
+            AppString.somethingWentWrong);
+  } catch (e) {
+    print("Delete office error $e");
+    return ApiData(
+        statusCode: 404, success: false, message: AppString.somethingWentWrong);
+  }
+}
+
 ///Get company office list
 Future<List<CompanyOfficeListData>> getCompanyOfficeList(
   BuildContext context,

@@ -16,6 +16,14 @@ import 'package:symmetry_establishment/modules/establishment/resources/establish
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:symmetry_establishment/data/appconfige_data/app_confige_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_scrollbar.dart';
+import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/company_identrity_manager.dart';
+import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/company_identity/company_identity_data_.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_tab_widget/widget/edit_office_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/whitelabelling/success_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/manage_hr/manage_work_schedule/work_schedule/widgets/delete_popup_const.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/delete_success_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/error_popups/failed_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/custom_icon_button_constant.dart';
 
 typedef BackButtonCallBack = void Function(bool val);
 
@@ -29,8 +37,15 @@ class ManageWidget extends StatefulWidget {
   final String stateName;
   final String countryName;
   final BackButtonCallBack backButtonCallBack;
+  /// The office as the Company Identity list loaded it; the Edit Office
+  /// dialog starts from it.
+  final CompanyIdentityModel office;
+  /// Whether this is the head office; the delete confirmation says so.
+  final bool isHeadOffice;
   ManageWidget({
     Key? key,
+    required this.office,
+    this.isHeadOffice = false,
     required this.officeID,
     required this.officeName,
     required this.backButtonCallBack,
@@ -86,6 +101,72 @@ class _ManageWidgetState extends State<ManageWidget> {
     super.initState();
     documentTypeGet(context);
     officeName = widget.officeName;
+    _office = widget.office;
+  }
+
+  /// The office with any edits made from this screen applied.
+  late CompanyIdentityModel _office;
+
+  /// Bumped after an edit so the Details and Zones tabs are rebuilt and load
+  /// the saved values. Without it the Details tab's own Save would send the
+  /// old lat/long back.
+  int _officeVersion = 0;
+
+  double get _officeLat => double.tryParse(_office.lat) ?? widget.officeLat;
+  double get _officeLon => double.tryParse(_office.long) ?? widget.officeLon;
+
+  Future<void> _editOffice() async {
+    final updated = await showDialog<CompanyIdentityModel>(
+      context: context,
+      builder: (_) => EditOfficePopup(office: _office),
+    );
+    if (updated == null || !mounted) return;
+    setState(() {
+      _office = updated;
+      officeName = updated.officeName;
+      _officeVersion++;
+    });
+    showDialog(
+      context: context,
+      builder: (_) => AddSuccessPopup(message: 'Edited successfully.'),
+    );
+  }
+
+  Future<void> _deleteOffice() async {
+    bool deleting = false;
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => DeletePopup(
+          title: 'Delete Office',
+          text: widget.isHeadOffice
+              ? '"$officeName" is the head office. Do you really want to delete it?'
+              : 'Do you really want to delete "$officeName"?',
+          loadingDuration: deleting,
+          onCancel: () => Navigator.pop(dialogContext),
+          onDelete: () async {
+            if (deleting) return;
+            setDialogState(() => deleting = true);
+            final response =
+                await deleteCompanyOffice(context, widget.companyOfficeId);
+            if (!mounted) return;
+            Navigator.pop(dialogContext);
+            if (response.success) {
+              // Show the confirmation before leaving: going back disposes
+              // this screen and its context.
+              showDialog(
+                  context: context,
+                  builder: (_) => const DeleteSuccessPopup());
+              widget.backButtonCallBack(true);
+            } else {
+              showDialog(
+                  context: context,
+                  builder: (_) => FailedPopup(text: response.message));
+            }
+          },
+        ),
+      ),
+    );
   }
 
   String officeName = '';  // local state for office name
@@ -128,12 +209,29 @@ class _ManageWidgetState extends State<ManageWidget> {
         children: [
           Padding(
                   padding: const EdgeInsets.only(
-                      left: AppSize.s140, bottom: AppPadding.p30,top: AppPadding.p20),
+                      left: AppSize.s140, right: AppPadding.p25,
+                      bottom: AppPadding.p30,top: AppPadding.p20),
                   child: Row(
                     children: [
                       Text(
                         officeName,
                         style: CompanyIdentityManageHeadings.customTextStyle(context),
+                      ),
+                      const Spacer(),
+                      CustomIconButtonConst(
+                        width: AppSize.s150,
+                        height: AppSize.s32,
+                        text: 'Edit Office',
+                        icon: Icons.mode_edit_outline_outlined,
+                        onPressed: _editOffice,
+                      ),
+                      const SizedBox(width: AppSize.s20),
+                      CustomIconButtonConst(
+                        width: AppSize.s150,
+                        height: AppSize.s32,
+                        text: 'Delete Office',
+                        icon: Icons.delete_outline_outlined,
+                        onPressed: _deleteOffice,
                       ),
                     ],
                   ),
@@ -379,18 +477,20 @@ class _ManageWidgetState extends State<ManageWidget> {
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
                       CIDetailsScreen(
+                        key: ValueKey('details-$_officeVersion'),
                         companyID: widget.companyID,
                         officeId: widget.officeID,
                         docTD: docID,
                         companyId: widget.companyID,
-                        companyOfficeid: widget.companyOfficeId, stateName: widget.stateName,
-                        countryName: widget.countryName, updateOfficeName: updateOfficeName,
+                        companyOfficeid: widget.companyOfficeId, stateName: _office.stateName,
+                        countryName: _office.countryName, updateOfficeName: updateOfficeName,
                       ),
                       CiZone(
+                        key: ValueKey('zones-$_officeVersion'),
                         companyID: widget.companyID,
                         officeId: widget.officeID,
-                        docId: docID, stateName: widget.stateName, countryName: widget.countryName,
-                        officeLat: widget.officeLat, officeLon: widget.officeLon,
+                        docId: docID, stateName: _office.stateName, countryName: _office.countryName,
+                        officeLat: _officeLat, officeLon: _officeLon,
                       ),
                       CiCorporateComplianceScreen(
                         docId: FrontendConfigStore.data!.config.corporateAndCompliance,
