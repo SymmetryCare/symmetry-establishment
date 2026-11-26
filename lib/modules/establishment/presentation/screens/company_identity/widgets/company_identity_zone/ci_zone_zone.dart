@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/company_identity_zone/widgets/zone_delete_helper.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/data/api/managers/establishment_manager/zone_manager.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/ci_corporate_compliance_doc/widgets/corporate_compliance_constants.dart';
@@ -19,11 +20,15 @@ class CIZoneZone extends StatefulWidget {
   final int countyId;
   final int companyID;
   final String officeId;
+  /// Called with the zone id after a zone is deleted, so the parent can
+  /// clear a Zone dropdown that still points at it.
+  final ValueChanged<int>? onZoneDeleted;
   const CIZoneZone(
       {super.key,
       required this.companyID,
       required this.officeId,
-      required this.countyId});
+      required this.countyId,
+      this.onZoneDeleted});
 
   @override
   State<CIZoneZone> createState() => _CIZoneZoneState();
@@ -171,6 +176,8 @@ class _CIZoneZoneState extends State<CIZoneZone> with AutoRefreshMixin<CIZoneZon
                 if (snapshot.hasData) {
                   int totalItems = snapshot.data!.length;
                   int totalPages = (totalItems / itemsPerPage).ceil();
+                  // A delete can empty the last page: step back to the new last page.
+                  if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
                   List<AllCountyZoneGet> paginatedData = snapshot.data!.skip((currentPage - 1) * itemsPerPage).take(itemsPerPage).toList();
                   return Column(
                     children: [
@@ -434,46 +441,18 @@ class _CIZoneZoneState extends State<CIZoneZone> with AutoRefreshMixin<CIZoneZon
                                                       },
                                                       icon:Icon(Icons.edit_outlined,
                                                         size:IconSize.I22,color: IconColorManager.bluebottom,),),
-                                                  // IconButton(
-                                                  //     splashColor: Colors.transparent,
-                                                  //     hoverColor: Colors.transparent,
-                                                  //     highlightColor: Colors.transparent,
-                                                  //     onPressed: () {
-                                                  //       showDialog(
-                                                  //           context: context,
-                                                  //           builder: (context) =>
-                                                  //               DeletePopup(
-                                                  //                   title: 'Delete Zone',
-                                                  //                   onCancel: () {
-                                                  //                 Navigator.pop(
-                                                  //                     context);
-                                                  //               }, onDelete:
-                                                  //                       () async {
-                                                  //                 await deleteZoneCountyData(
-                                                  //                     context,
-                                                  //                     zone.zoneId);
-                                                  //                 getZoneByCounty(
-                                                  //                         context,
-                                                  //                         widget
-                                                  //                             .officeId,
-                                                  //                         25,
-                                                  //                         1,
-                                                  //                         20)
-                                                  //                     .then((data) {
-                                                  //                   _zoneController
-                                                  //                       .add(data);
-                                                  //                 }).catchError(
-                                                  //                         (error) {});
-                                                  //                 Navigator.pop(
-                                                  //                     context);
-                                                  //               }));
-                                                  //     },
-                                                  //     icon: Icon(
-                                                  //       Icons.delete_outline,
-                                                  //       size: 18,
-                                                  //       color:
-                                                  //           ColorManager.faintOrange,
-                                                  //     )),
+                                                  ZoneDeleteIconButton(
+                                                    tooltip: 'Delete Zone',
+                                                    onPressed: () async {
+                                                      final deleted = await confirmZoneDelete(
+                                                        context: context,
+                                                        title: 'Delete Zone',
+                                                        text: 'Do you really want to delete "${zone.zoneName}"? Its zip codes will be deleted too.',
+                                                        delete: () => deleteZoneWithZipcodes(context, zoneId: zone.zoneId, countyId: zone.countyId),
+                                                      );
+                                                      if (deleted) widget.onZoneDeleted?.call(zone.zoneId);
+                                                    },
+                                                  ),
                                                 ],
                                               ),
                                             )

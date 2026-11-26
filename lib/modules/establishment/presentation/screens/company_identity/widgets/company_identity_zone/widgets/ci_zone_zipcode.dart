@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:symmetry_establishment/app/services/data_refresh/data_refresh.dart';
 import 'package:flutter/material.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/company_identity_zone/widgets/zone_delete_helper.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:symmetry_establishment/modules/establishment/resources/establishment_resources/establishment_string_manager.dart';
 import 'package:symmetry_establishment/app/resources/value_manager.dart';
@@ -180,6 +181,8 @@ class _CiZoneZipcodeState extends State<CiZoneZipcode> with AutoRefreshMixin<CiZ
                 if (snapshot.hasData) {
                   int totalItems = snapshot.data!.length;
                   int totalPages = (totalItems / itemsPerPage).ceil();
+                  // A delete can empty the last page: step back to the new last page.
+                  if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
                   List<AllZipCodeGet> paginatedData = snapshot.data!.skip((currentPage - 1) * itemsPerPage).take(itemsPerPage).toList();
 
                   return Column(
@@ -326,6 +329,15 @@ class _CiZoneZipcodeState extends State<CiZoneZipcode> with AutoRefreshMixin<CiZ
                                             },
                                                 icon: Icon(Icons.edit_outlined,
                                                   size:IconSize.I22,color: IconColorManager.bluebottom,),),
+                                            ZoneDeleteIconButton(
+                                              tooltip: 'Delete Zip Code',
+                                              onPressed: () => confirmZoneDelete(
+                                                context: context,
+                                                title: 'Delete Zip Code',
+                                                text: 'Do you really want to delete zip code "${zipcode.zipcode}"?',
+                                                delete: () => deleteZipCodeSetup(context, zipcode.zipcodeSetupId!),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       )

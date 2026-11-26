@@ -391,6 +391,57 @@ Future<ApiData> deleteZoneCountyData(BuildContext context, int zoneId) async {
   }
 }
 
+/// Deletes a zone together with its zip codes.
+///
+/// The backend's DELETE /zone/{id} leaves the zone's zip codes behind, so
+/// they are deleted first. If they can't be read or one fails to delete,
+/// the zone itself is kept and the failure is returned.
+Future<ApiData> deleteZoneWithZipcodes(
+    BuildContext context, {required int zoneId, required int countyId}) async {
+  final List<int> zipcodeSetupIds = [];
+  try {
+    final response = await Api(context).get(
+        path: AllZoneRepository.zipcodeByCountyIdAndZoneId(
+            zoneId: zoneId, countyId: countyId));
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      return ApiData(
+          statusCode: response.statusCode ?? 500,
+          success: false,
+          message: "Couldn't load this zone's zip codes, so the zone was not deleted.");
+    }
+    for (final item in (response.data as List? ?? const [])) {
+      final id = item['zipcodeSetupId'];
+      if (id is int) zipcodeSetupIds.add(id);
+    }
+  } catch (e) {
+    debugPrint("Zone zip codes load error $e");
+    return ApiData(
+        statusCode: 500,
+        success: false,
+        message: "Couldn't load this zone's zip codes, so the zone was not deleted.");
+  }
+
+  for (var i = 0; i < zipcodeSetupIds.length; i++) {
+    if (!context.mounted) {
+      return ApiData(statusCode: 500, success: false, message: AppString.somethingWentWrong);
+    }
+    final result = await deleteZipCodeSetup(context, zipcodeSetupIds[i]);
+    if (!result.success) {
+      return ApiData(
+          statusCode: result.statusCode,
+          success: false,
+          message: i == 0
+              ? "Couldn't delete this zone's zip codes, so the zone was not deleted."
+              : "Deleted $i of ${zipcodeSetupIds.length} zip codes, then one failed. The zone was not deleted.");
+    }
+  }
+
+  if (!context.mounted) {
+    return ApiData(statusCode: 500, success: false, message: AppString.somethingWentWrong);
+  }
+  return deleteZoneCountyData(context, zoneId);
+}
+
 /// Zone County add
 Future<ApiData> addZoneCounty(
     BuildContext context, int zoneId, int countyId) async {

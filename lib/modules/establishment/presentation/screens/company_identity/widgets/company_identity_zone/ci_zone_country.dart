@@ -13,11 +13,15 @@ import 'package:symmetry_establishment/app/resources/common_resources/common_the
 import 'package:symmetry_establishment/modules/establishment/data/models/establishment_data/zone/zone_model_data.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/shared_widgets/legacy/widgets/profile_bar/widget/pagination_widget.dart';
 import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/whitelabelling/success_popup.dart';
+import 'package:symmetry_establishment/modules/establishment/presentation/screens/company_identity/widgets/company_identity_zone/widgets/zone_delete_helper.dart';
 
 class CIZoneCountry extends StatefulWidget {
   final int companyID;
   final String officeId;
-  const CIZoneCountry({super.key, required this.companyID, required this.officeId});
+  /// Called with the county id after a county is deleted, so the parent can
+  /// clear a County dropdown that still points at it.
+  final ValueChanged<int>? onCountyDeleted;
+  const CIZoneCountry({super.key, required this.companyID, required this.officeId, this.onCountyDeleted});
 
   @override
   State<CIZoneCountry> createState() => _CIZoneCountryState();
@@ -151,6 +155,8 @@ class _CIZoneCountryState extends State<CIZoneCountry> with AutoRefreshMixin<CIZ
                 if (snapshot.hasData) {
                   int totalItems = snapshot.data!.length;
                   int totalPages = (totalItems / itemsPerPage).ceil();
+                  // A delete can empty the last page: step back to the new last page.
+                  if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
                   List<AllCountyGet> paginatedData = snapshot.data!.skip((currentPage - 1) * itemsPerPage).take(itemsPerPage).toList();
 
                   return Column(
@@ -287,6 +293,18 @@ class _CIZoneCountryState extends State<CIZoneCountry> with AutoRefreshMixin<CIZ
                                                         });
                                                       }, icon: Icon(Icons.edit_outlined,
                                                       size:IconSize.I22,color: IconColorManager.bluebottom,),),
+                                                    ZoneDeleteIconButton(
+                                                      tooltip: 'Delete County',
+                                                      onPressed: () async {
+                                                        final deleted = await confirmZoneDelete(
+                                                          context: context,
+                                                          title: 'Delete County',
+                                                          text: 'Do you really want to delete "${county.countyName}"? Its zones and zip codes will be deleted too.',
+                                                          delete: () => deleteCounty(context, county.countyId),
+                                                        );
+                                                        if (deleted) widget.onCountyDeleted?.call(county.countyId);
+                                                      },
+                                                    ),
                                                   ],
                                                 ),
                                               ),

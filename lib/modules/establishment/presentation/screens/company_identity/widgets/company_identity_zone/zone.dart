@@ -135,6 +135,32 @@ class _CiOrgDocumentState extends State<CiZone> {
   }
   bool isAddButtonEnabled = false;
 
+  /// A deleted county also takes its zones and zip codes with it (backend),
+  /// so reset any dropdown that still points at it.
+  void _onCountyDeleted(int deletedCountyId) {
+    if (!mounted) return;
+    setState(() {
+      if (countySortId == deletedCountyId) {
+        coyntyNameVal = 'Select County';
+        countySortId = 0;
+      }
+      if (countyZipCodeSortId == deletedCountyId) {
+        coyntyZipNameVal = 'Select County';
+        countyZipCodeSortId = 0;
+        zoneNameVal = 'Select Zone';
+        zoneSortId = 0;
+      }
+    });
+  }
+
+  void _onZoneDeleted(int deletedZoneId) {
+    if (!mounted || zoneSortId != deletedZoneId) return;
+    setState(() {
+      zoneNameVal = 'Select Zone';
+      zoneSortId = 0;
+    });
+  }
+
   // Helper: Show button only when both county and zone are selected
   bool get shouldShowAddButton {
     return selectedCounty != 'Select County' && zoneNameVal != 'Select Zone';
@@ -854,11 +880,13 @@ class _CiOrgDocumentState extends State<CiZone> {
                 CIZoneCountry(
                   companyID: widget.companyID,
                   officeId: widget.officeId,
+                  onCountyDeleted: _onCountyDeleted,
                 ),
                 CIZoneZone(
                   countyId: countySortId,
                   companyID: widget.companyID,
                   officeId: widget.officeId,
+                  onZoneDeleted: _onZoneDeleted,
                 ),
                 CiZoneZipcode(
                   companyID: widget.companyID,
